@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# DuckDB
+*.duckdb
+*.duckdb.wal
+*.db
+
+# Local data — everything lands in object storage, never in git
+data/
+*.parquet
+*.json.gz
+
+# Credentials. These live in /etc/jenga.env and are loaded via `s3env`.
+.env
+*.pem
+*.key
+credentials
+
+# Editor
+.vscode/
+*.swp
+.DS_Store
+.ghpulsevenv/

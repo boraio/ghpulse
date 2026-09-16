@@ -1,0 +1,42 @@
+# Runs on the cluster's own ARC runners (arc-runner-set), which are
+# ephemeral pods on the k8s workers.
+#
+# Deliberately does NOT touch object storage: CI validates the code, not the
+# data. Anything needing S3 credentials belongs in a scheduled job with a
+# service account, not in a PR check.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: arc-runner-set
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install
+        run: |
+          pip install --quiet -r requirements.txt
+          pip install --quiet ruff
+
+      - name: Lint
+        run: ruff check ingest/
+
+      - name: Compile
+        run: python -m compileall -q ingest/
+
+      - name: Transform smoke test
+        # Proves the JSON -> Parquet transform and the nested payload access
+        # work, using synthetic events rather than reaching out to
+        # gharchive.org. Fast, offline, and it fails loudly if the schema
+        # handling regresses.
+        run: python tests/test_transform.py
