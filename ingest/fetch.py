@@ -12,6 +12,7 @@ what makes reprocessing safe.
 Usage:
     s3env && python3 ingest/fetch.py 2026-09-14 12
     s3env && python3 ingest/fetch.py 2026-09-14 0 23     # a whole day
+    s3env && python3 ingest/fetch.py --dry-run 2026-09-14 12
 """
 import datetime
 import gzip
@@ -56,15 +57,19 @@ def s3_config(con: duckdb.DuckDBPyConnection) -> None:
         con.execute(f"SET {setting}='{val}'")
 
 
-def fetch_hour(con: duckdb.DuckDBPyConnection, date: str, hour: int) -> int:
+def fetch_hour(con: duckdb.DuckDBPyConnection, date: str, hour: int, dry_run: bool) -> int:
     """Download one hour, write it to bronze, return the row count."""
     url = GHARCHIVE.format(date=date, hour=hour)
     target = f"s3://{BUCKET}/bronze/events/dt={date}/hour={hour:02d}/data.parquet"
 
     print(f"  {url}")
+    if dry_run:
+        print(f"    DRY-RUN: Target path would be {target}")
+        return 0
+
     with tempfile.TemporaryDirectory() as tmp:
         gz = Path(tmp) / "events.json.gz"
-        raw = Path(tmp) / "events.json"
+        plain = Path(tmp) / "events.json"
 
         try:
             req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
@@ -83,11 +88,12 @@ def fetch_hour(con: duckdb.DuckDBPyConnection, date: str, hour: int) -> int:
             print(f"    SKIP: suspiciously small ({size_mb:.2f} MB)")
             return 0
 
-        # Decompress rather than letting DuckDB read the .gz directly: newer
-        # GH Archive files are concatenated gzip members, which some readers
-        # truncate at the first member without erroring — silently losing
-        # most of the hour.
-        with gzip.open(gz, "rb") as fin, open(raw, "wb") as fout:
+        # Create a plain-text copy of the decompressed file for debugging
+        # purposes. This allows us to inspect the raw JSON data using tools
+        # like head and jq when DuckDB's type inference fails on a bad hour.
+        # Note that DuckDB can read .gz files natively, so this step costs
+        # approximately 10x the disk space.
+        with gzip.open(gz, "rb") as fin, open(plain, "wb") as fout:
             while chunk := fin.read(1 << 20):
                 fout.write(chunk)
 
@@ -118,7 +124,7 @@ def fetch_hour(con: duckdb.DuckDBPyConnection, date: str, hour: int) -> int:
                     CAST(created_at AS TIMESTAMP) AS created_at,
                     '{date}' AS dt,
                     {hour} AS hour
-                FROM read_json_auto('{raw}', union_by_name=true, ignore_errors=true)
+                FROM read_json_auto('{plain}', union_by_name=true, ignore_errors=true)
             ) TO '{target}' (FORMAT PARQUET, COMPRESSION ZSTD, OVERWRITE_OR_IGNORE 1)
         """)
 
@@ -130,24 +136,31 @@ def fetch_hour(con: duckdb.DuckDBPyConnection, date: str, hour: int) -> int:
 
 
 def main() -> None:
-    if len(sys.argv) < 3:
-        sys.exit(__doc__)
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Fetch GH Archive data and write to bronze layer.")
+    parser.add_argument("--dry-run", action="store_true", help="Print the URL and target path and exit without downloading or writing anything.")
+    parser.add_argument("date", help="Date in YYYY-MM-DD format")
+    parser.add_argument("start_hour", type=int, help="Start hour (0-23)")
+    parser.add_argument("end_hour", type=int, nargs="?", default=None, help="End hour (0-23), defaults to start_hour if not provided")
+
+    args = parser.parse_args()
 
     # Normalise the date: GH Archive paths are zero-padded for the month but
     # NOT for the hour (2026-09-01-5.json.gz, not -05). Getting either wrong
     # yields a 404 that looks like missing data.
     try:
-        date = datetime.date.fromisoformat(sys.argv[1]).isoformat()
+        date = datetime.date.fromisoformat(args.date).isoformat()
     except ValueError:
-        sys.exit(f"bad date {sys.argv[1]!r} — expected YYYY-MM-DD")
-    start = int(sys.argv[2])
-    end = int(sys.argv[3]) if len(sys.argv) > 3 else start
+        sys.exit(f"bad date {args.date!r} — expected YYYY-MM-DD")
+    start = args.start_hour
+    end = args.end_hour if args.end_hour is not None else start
 
     con = duckdb.connect()
     s3_config(con)
 
     print(f"ghpulse: {date} hours {start}..{end} -> s3://{BUCKET}/bronze/")
-    total = sum(fetch_hour(con, date, h) for h in range(start, end + 1))
+    total = sum(fetch_hour(con, date, h, args.dry_run) for h in range(start, end + 1))
     print(f"\ntotal: {total:,} events")
 
 

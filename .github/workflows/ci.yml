@@ -16,10 +16,11 @@ jobs:
   lint:
     runs-on: arc-runner-set
     steps:
-      - uses: actions/checkout@v4
+      # v5/v6 run on Node 24; v4/v5 were Node 20, which GitHub is deprecating.
+      - uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 

@@ -56,6 +56,49 @@ and nothing else. If silver logic turns out to be wrong — and it will —
 reprocessing costs nothing because the raw data is still there. This is why
 bronze exists at all rather than transforming on ingest.
 
+## What went wrong building this
+
+Three bugs, each caught differently, each costing one re-run of one
+partition. That is bronze immutability earning its keep — the schema
+decision was wrong twice and neither time required a migration.
+
+**GH Archive 403s urllib's default user-agent.** The same URL returned 200
+to `curl` and 403 to Python, so a working file looked like a missing one.
+Fixed by setting a `User-Agent` header.
+
+**`read_json_auto` merges every event type's payload into one struct.**
+PushEvent's `commits` beside IssuesEvent's `issue` beside
+PullRequestEvent's `pull_request` — roughly 200 fields, nearly all NULL per
+row. Querying it crashed DuckDB outright. Bronze now stores `payload` as
+JSON text: preserve everything, commit to nothing, and let silver extract
+typed columns per event type.
+
+**A "harmless" optimisation broke string matching silently.** Adding
+`maximum_depth=2` to limit inference cost also stopped `actor` being parsed
+as a struct, so `actor.login` returned a quoted JSON value — `'"dave[bot]"'`
+rather than `dave[bot]`. Every string comparison stopped matching. Seven of
+eight tests still passed, because `count(DISTINCT actor.login)` returns 4
+either way. Only the bot filter caught it. Against real data this would have
+produced a funnel with zero bots filtered and no reason to suspect anything.
+
+That last one is why the test suite checks values and not just shapes.
+
+## Known limitations
+
+**`init.sql` materialises bronze into memory rather than querying it in
+place.** DuckDB 1.5.5 crashes on any `GROUP BY` with more than one
+`count(DISTINCT)` when reading remote Parquet — an upstream bug, narrowed
+by elimination and documented in `analysis/init.sql`. Workable at hour and
+day scale, not at month scale, which is one of several reasons aggregation
+moves to Spark in milestone 1.
+
+**The bot filter only catches the `[bot]` suffix.** Plenty of automation
+does not follow that convention, so human counts are an upper bound.
+
+**One hour is not enough data to answer the actual question.** The funnel
+query works but says little: nobody becomes a maintainer in an hour, and
+`PushEvent` is ~95% of all activity.
+
 ## Layout
 
 ```

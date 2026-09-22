@@ -25,3 +25,4 @@ credentials
 *.swp
 .DS_Store
 .ghpulsevenv/
+.aider*
