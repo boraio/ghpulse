@@ -179,6 +179,15 @@ def main() -> int:
 
     C = backfill.classify
 
+    def raises(exc_type, fn):
+        try:
+            fn()
+        except exc_type:
+            return True
+        except Exception:
+            return False
+        return False
+
     results += [
         check("404 is recorded absent", C(http_error(404)), backfill.ABSENT),
         check("401 and 403 abort the run", [C(http_error(401)), C(http_error(403))], [backfill.ABORT, backfill.ABORT]),
