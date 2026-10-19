@@ -1,5 +1,10 @@
 from __future__ import annotations
 import datetime as dt
+import gzip
+import http.client
+import random
+import urllib.error
+import zlib
 
 def parse_hour(s: str) -> dt.datetime:
     """Parse 'YYYY-MM-DDTHH' (e.g. 2026-09-01T05) into a timezone-aware UTC datetime."""
