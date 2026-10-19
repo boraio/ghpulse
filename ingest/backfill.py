@@ -76,7 +76,10 @@ def count_lines(chunks) -> int:
 
 def backoff_s(attempt: int, retry_after: float | None = None, rng=random.random) -> float:
     """Seconds to wait before retry number attempt (0-based): exponential with jitter, never less than retry_after."""
-    return -1.0
+    delay = min(60.0, 2.0 * 2 ** min(attempt, 10)) * (0.5 + 0.5 * rng())
+    if retry_after is not None:
+        delay = max(delay, float(retry_after))
+    return delay
 
 
 def too_recent(key: tuple[str, int], now: dt.datetime) -> bool:
