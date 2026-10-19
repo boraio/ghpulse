@@ -35,6 +35,9 @@ jobs:
       - name: Compile
         run: python -m compileall -q ingest/
 
+      - name: Offline checks
+        run: python tests/test_transform.py
+
       - name: Transform smoke test
         # Proves the JSON -> Parquet transform and the nested payload access
         # work, using synthetic events rather than reaching out to
