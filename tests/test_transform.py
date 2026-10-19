@@ -157,6 +157,16 @@ def main() -> int:
 
         check("force returns a copy, not the caller's list", backfill.plan(K, {}, set(), "force") is not K, True),
         check("unknown status is redone", backfill.plan([K[0]], {K[0]: "mystery"}, {K[0]}, "resume"), [K[0]]),
+        check("count_lines: no trailing newline", backfill.count_lines([b"a\nb"]), 2),
+        check("count_lines: across chunks", backfill.count_lines([b"a\n", b"b\n"]), 2),
+        check("count_lines: line split across chunks", backfill.count_lines([b"a", b"b\n"]), 1),
+        check("count_lines: empty input", backfill.count_lines([]), 0),
+        check("backoff doubles per attempt", [backfill.backoff_s(0, rng=lambda: 1.0), backfill.backoff_s(2, rng=lambda: 1.0)], [2.0, 8.0]),
+        check("backoff jitter floor is half", backfill.backoff_s(0, rng=lambda: 0.0), 1.0),
+        check("backoff is capped at 60 seconds", backfill.backoff_s(10, rng=lambda: 1.0), 60.0),
+        check("backoff honours a longer Retry-After", backfill.backoff_s(0, retry_after=30, rng=lambda: 1.0), 30.0),
+        check("Retry-After never shortens the wait", backfill.backoff_s(5, retry_after=1, rng=lambda: 1.0), 60.0),
+        check("hours inside the publish lag are refused", [backfill.too_recent(("2026-09-01", 10), backfill.parse_hour("2026-09-01T12")), backfill.too_recent(("2026-09-01", 9), backfill.parse_hour("2026-09-01T12")), backfill.too_recent(("2026-09-01", 5), backfill.parse_hour("2026-09-01T12"))], [True, False, False]),
     ]
 
     import gzip
