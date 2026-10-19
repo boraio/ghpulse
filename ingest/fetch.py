@@ -64,6 +64,15 @@ def s3_config(con: duckdb.DuckDBPyConnection) -> None:
 
 
 def transform_sql(src, target, date, hour) -> str:
+    # union_by_name: event payloads differ by type, and the schema drifts
+    # as GitHub adds fields. Without it, a file whose first rows lack a
+    # column fails on a later row that has it.
+    #
+    # Do NOT add maximum_depth here. Limiting it stops actor and repo
+    # being parsed as structs too, so actor.login returns a quoted JSON
+    # value ('"dave[bot]"') rather than a plain string — and every
+    # string comparison against it silently stops matching.
+
     return f"""
         COPY (
             SELECT
