@@ -128,6 +128,25 @@ def main() -> int:
     except ValueError:
         results[-1] = True
 
+    K = [("2026-09-01", h) for h in range(5)]
+    marked = {K[0]: backfill.INGESTED, K[1]: backfill.ABSENT, K[2]: backfill.FAILED, K[3]: backfill.INGESTED}
+    present = {K[0]}
+
+    results += [
+        check("backfill.plan(K, marked, present, 'resume') equals [K[2], K[3], K[4]]",
+              backfill.plan(K, marked, present, "resume"),
+              [K[2], K[3], K[4]]),
+        check("backfill.plan(K, marked, present, 'retry-absent') equals [K[1], K[2], K[3], K[4]]",
+              backfill.plan(K, marked, present, "retry-absent"),
+              [K[1], K[2], K[3], K[4]]),
+        check("backfill.plan(K, marked, present, 'force') equals K",
+              backfill.plan(K, marked, present, "force"),
+              K),
+        check("backfill.parse_hour('2026-09-01T05') equals backfill.dt.datetime(2026, 9, 1, 5, tzinfo=backfill.dt.timezone.utc)",
+              backfill.parse_hour('2026-09-01T05'),
+              backfill.dt.datetime(2026, 9, 1, 5, tzinfo=backfill.dt.timezone.utc)),
+    ]
+
     print()
     if all(results):
         print("all checks passed")
