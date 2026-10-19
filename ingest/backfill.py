@@ -30,8 +30,10 @@ RETRY, FAIL, ABORT = "retry", "fail", "abort"
 def partition_key(path: str) -> tuple[str, int]:
     """From a path like s3://b/bronze/events/dt=2026-09-01/hour=05/data.parquet return ('2026-09-01', 5)."""
     parts = path.split('/')
-    date_part = next(part for part in parts if part.startswith('dt='))
-    hour_part = next(part for part in parts if part.startswith('hour='))
+    date_part = next((part for part in parts if part.startswith('dt=')), None)
+    hour_part = next((part for part in parts if part.startswith('hour=')), None)
+    if date_part is None or hour_part is None:
+        raise ValueError(f"not a bronze partition path: {path!r}")
     date_iso = date_part.split('=')[1]
     hour = int(hour_part.split('=')[1])
     return (date_iso, hour)
