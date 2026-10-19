@@ -55,6 +55,7 @@ def plan(keys, statuses, present, mode) -> list:
     return result
 
 
+import random
 import urllib.error
 import http.client
 import gzip
