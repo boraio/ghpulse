@@ -179,6 +179,8 @@ def main() -> int:
         check("URLError retries", C(urllib.error.URLError("x")), backfill.RETRY),
         check("unexpected error fails without retry", C(ValueError("x")), backfill.FAIL),
         check("a local file error fails without retry", C(FileNotFoundError("x")), backfill.FAIL),
+        check("incomplete reads retry", C(http.client.IncompleteRead(b"")), backfill.RETRY),
+        check("corrupt gzip stream errors retry", C(zlib.error("x")), backfill.RETRY),
     ]
 
     print()
