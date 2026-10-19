@@ -69,7 +69,27 @@ project demonstrates.
 transform, land on Ceph, query from DuckDB. 100,774 events, 17,948 actors,
 22,661 repos, 16 event types. Nine offline checks green. CI passing.
 
-Everything after this is ahead of us.
+**Milestone 1, step 0 (backfill mechanics) is in progress**, last updated
+2026-10-19, on the local, unpushed branch `backfill-mechanics`. Nothing has
+been merged and no backfill has been run yet.
+
+Done and verified offline:
+
+- `ingest/fetch.py` refactored into `gharchive_url`, `bronze_path` and a
+  module-level `transform_sql`, with no behaviour change. Checked by comparing
+  the Parquet output for 2026-09-01 hour 0 against a baseline copy (same schema,
+  0 differing rows in both directions, 51,582 rows), after a control run proved
+  the comparison passes on identical input.
+- `ingest/backfill.py` pure functions: `parse_hour`, `hour_range`,
+  `partition_key`, `plan`, `classify`, `count_lines`, `backoff_s`, `too_recent`.
+  Each was driven by checks in `tests/test_transform.py`, written first and
+  seen to fail before the implementation. The module is tidied (imports at the
+  top, a module docstring, `partition_key` raising `ValueError` on a malformed
+  path). The suite is at 45 PASS, 0 FAIL.
+
+Not yet written: download, decompress, marker read/write, the per-hour worker,
+the CLI, and the first real run. Decisions, remaining work and open unknowns
+are in **`claude/milestone_01_step0.md`**.
 
 ## Milestones
 
@@ -84,7 +104,7 @@ See **`milestone_01.md`** for scope, the four open decisions, order of work and
 exit criteria. In short: a resumable backfill with a manifest, a week ingested
 and measured before committing to a month, silver tables for the four
 funnel-relevant event types, and a `most-popular` baseline evaluated on a
-temporal split.
+temporal split. Progress on step 0 is in `claude/milestone_01_step0.md`.
 
 ### Milestone 2 — the recommender
 
@@ -142,16 +162,31 @@ Each of these cost real time. Do not relitigate them without evidence.
   that claim was fabricated by a local model and tested false.
 - **GH Archive URLs zero-pad the month but not the hour** —
   `2026-09-01-5.json.gz`, not `-05`. Getting it wrong yields a 404 that looks
-  like missing data.
+  like missing data. Our own bronze paths do zero-pad the hour (`hour=05`).
 - **GH Archive 403s `urllib` without a `User-Agent` header**, while returning
   200 to curl for the same URL.
 - **Grouped multi-`count(DISTINCT)` over remote Parquet crashes DuckDB.**
   Worked around by materialising bronze into a local table — which is part of
   why a month needs Spark.
+- **Bronze reads from the S3 path need `hive_partitioning=false`.** Without it,
+  comparing a partition against an identical copy of itself failed (the schemas
+  differed); with it, the control passed. The cause is believed to be DuckDB
+  auto-detecting the `dt=` and `hour=` path segments as partition columns that
+  clash with the `dt` and `hour` columns stored in the file. The fix is
+  verified; the mechanism is not.
+- **Comparing naive and timezone-aware datetimes raises `TypeError`**, while
+  `==` between them silently returns `False`. Verified. `parse_hour` therefore
+  returns tz-aware UTC and `too_recent` needs an aware `now`.
+- **`plan()` is explicit per-key branches, with no catch-all `else`.** Its first
+  version used one boolean expression with an `or`/`and` precedence slip, so a
+  FAILED hour whose data existed was never retried. A later model rewrite added
+  an `else` that appended every key and made the function return everything.
+  Both are now covered by checks.
 - **`tests/test_transform.py` is a standalone script**, run as
   `python tests/test_transform.py`, not pytest. It uses a `check(label, got,
   want)` helper and four deliberately ragged synthetic events. Add checks
-  inside `main()`; never restructure it.
+  inside `main()`; never restructure it. For "raises" checks use the
+  `raises(exc_type, fn)` helper inside `main()`, so a failure prints a FAIL line.
 - **CI validates the code, not the data.** Nothing in `tests/` touches the
   network or object storage. Anything needing S3 credentials belongs in a
   scheduled job with a service account, not a PR check.
@@ -163,12 +198,55 @@ Each of these cost real time. Do not relitigate them without evidence.
 
 - Virtualenv is `.ghpulsevenv`. Activate it before running anything — including
   before launching any assistant that will invoke `pytest` or `ruff`, or it
-  resolves the system binaries and reports misleading failures.
+  resolves the system binaries and reports misleading failures. This includes
+  the pane used for acceptance checks: without the venv, `python` is missing
+  and the FAIL/PASS counts both print 0 (a PASS count of 0 is the tell).
 - Dependencies in `requirements.txt`; dev tools in `requirements-dev.txt`.
 - Comments explain **why**, not what the next line does. Never state a claim
   about a tool's behaviour that hasn't been verified.
 - Secrets live in `/etc/jenga.env`, loaded via shell helpers. `.gitignore`
   excludes `.env`, `*.pem`, `*.key`, `credentials`, `.ghpulsevenv/`.
+
+### Working with aider and the local model
+
+Code is written by aider with the local model; these rules come from what went
+wrong in milestone 1 step 0.
+
+- **One change per prompt, one anchor per edit.** An edit that touches two
+  places (an import at the top and code far below) is split into two prompts.
+  Multi-part prompts overran the 4096-token output cap and produced bad commits.
+- **Insertions and single-line replacements are reliable; deletions and
+  block replacements are not.** The model once deleted the wrong branch, and
+  once wiped nine existing checks while "adding" below them. When it has to
+  reproduce an anchor line, give that line verbatim in the prompt: a prompt
+  that gave only a label made it guess the rest and fail to match. With the
+  exact text supplied, a five-line deletion did work.
+- **Every prompt gets a mechanical acceptance check in a second pane.** Record
+  a base hash first. Then run `git diff <base> HEAD | grep '^-[^-]'` (it must
+  print only the intended removals), the FAIL and PASS counts (PASS may only
+  grow), and `git diff <base> HEAD --stat`. A green suite on its own is not
+  evidence: the model once passed it by deleting the tests.
+- **Test first, against a stub that returns wrong values** (not one that
+  raises), so the checks fail cleanly for the right reason.
+- **Do not run `/test` while a check is red.** It feeds the failure to the
+  model, which patches the failing line, and it twice fixed the wrong thing.
+  Run the suite in the other pane.
+- `/diff` goes through `less` and hides its output; use
+  `git --no-pager diff`.
+- aider commits every edit, so the branch fills with small commits. It is
+  local; squash before merging, as a deliberate history rewrite.
+- Observed limits: context of 16384 tokens per slot and a 4096-token output
+  cap.
+- **Temperature is set explicitly to `0.0`** in `.aider.model.settings.yml`
+  (`extra_params: temperature: 0.0`; it was 0.1). Verified that the file's value
+  reaches the server: the llama.cpp server's own default is 0.8 (from `/props`),
+  yet after aider requests `/slots` showed the slot at the value set in the
+  file (0.1, then 0.0 after the change). Keep the value explicit and do not
+  delete the file: a request carrying no temperature would get the server's
+  0.8. Whether 0.1 versus 0.0 changes the edit success rate was not measured;
+  0.0 was chosen so that a failed prompt fails the same way each time, which
+  suits diagnosing failures over re-sending them. aider's own default when the
+  file is absent was not checked.
 
 ## Non-goals
 
