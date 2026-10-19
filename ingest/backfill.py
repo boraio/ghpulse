@@ -30,11 +30,24 @@ def partition_key(path: str) -> tuple[str, int]:
 
 def plan(keys, statuses, present, mode) -> list:
     """Return the hours to process, in input order."""
-    if mode == "force":
-        return keys
-    elif mode == "resume":
-        return [key for key in keys if key not in statuses or statuses[key] == FAILED or (statuses[key] == INGESTED and key not in present)]
-    elif mode == "retry-absent":
-        return [key for key in keys if key not in statuses or statuses[key] in {FAILED, ABSENT} and key not in present]
-    else:
+    if mode not in {"resume", "retry-absent", "force"}:
         raise ValueError(f"Unknown mode: {mode}")
+        
+    if mode == "force":
+        return list(keys)
+        
+    result = []
+    for key in keys:
+        status = statuses.get(key)
+        if status is None:
+            result.append(key)
+        elif status == FAILED:
+            result.append(key)
+        elif status == INGESTED and key not in present:
+            result.append(key)
+        elif status == ABSENT and mode == "retry-absent":
+            result.append(key)
+        else:
+            result.append(key)
+        
+    return result
