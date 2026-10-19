@@ -63,6 +63,30 @@ def s3_config(con: duckdb.DuckDBPyConnection) -> None:
         con.execute(f"SET {setting}='{val}'")
 
 
+def transform_sql(src, target, date, hour) -> str:
+    return f"""
+        COPY (
+            SELECT
+                id, type, actor, repo,
+                -- payload as JSON TEXT, not a struct.
+                -- read_json_auto merges every event type's payload into
+                -- one giant struct — PushEvent's `commits` alongside
+                -- IssuesEvent's `issue` alongside PullRequestEvent's
+                -- `pull_request`, ~200 fields, nearly all NULL per row.
+                -- Beyond being wasteful, DuckDB crashes with
+                -- "INTERNAL Error: Unsupported type for
+                -- NumericValueUnionToValue" when querying it.
+                -- JSON preserves everything and commits to nothing;
+                -- silver extracts typed columns per event type.
+                CAST(payload AS JSON) AS payload,
+                public,
+                CAST(created_at AS TIMESTAMP) AS created_at,
+                '{date}' AS dt,
+                {hour} AS hour
+            FROM read_json_auto('{src}', union_by_name=true, ignore_errors=true)
+        ) TO '{target}' (FORMAT PARQUET, COMPRESSION ZSTD, OVERWRITE_OR_IGNORE 1)
+    """
+
 def fetch_hour(con: duckdb.DuckDBPyConnection, date: str, hour: int, dry_run: bool) -> int:
     """Download one hour, write it to bronze, return the row count."""
     url = gharchive_url(date, hour)
@@ -75,7 +99,7 @@ def fetch_hour(con: duckdb.DuckDBPyConnection, date: str, hour: int, dry_run: bo
 
     with tempfile.TemporaryDirectory() as tmp:
         gz = Path(tmp) / "events.json.gz"
-        plain = Path(tmp) / "events.json"
+        src = Path(tmp) / "events.json"
 
         try:
             req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
@@ -99,40 +123,11 @@ def fetch_hour(con: duckdb.DuckDBPyConnection, date: str, hour: int, dry_run: bo
         # like head and jq when DuckDB's type inference fails on a bad hour.
         # Note that DuckDB can read .gz files natively, so this step costs
         # approximately 10x the disk space.
-        with gzip.open(gz, "rb") as fin, open(plain, "wb") as fout:
+        with gzip.open(gz, "rb") as fin, open(src, "wb") as fout:
             while chunk := fin.read(1 << 20):
                 fout.write(chunk)
 
-        # union_by_name: event payloads differ by type, and the schema drifts
-        # as GitHub adds fields. Without it, a file whose first rows lack a
-        # column fails on a later row that has it.
-        #
-        # Do NOT add maximum_depth here. Limiting it stops actor and repo
-        # being parsed as structs too, so actor.login returns a quoted JSON
-        # value ('"dave[bot]"') rather than a plain string — and every
-        # string comparison against it silently stops matching.
-        con.execute(f"""
-            COPY (
-                SELECT
-                    id, type, actor, repo,
-                    -- payload as JSON TEXT, not a struct.
-                    -- read_json_auto merges every event type's payload into
-                    -- one giant struct — PushEvent's `commits` alongside
-                    -- IssuesEvent's `issue` alongside PullRequestEvent's
-                    -- `pull_request`, ~200 fields, nearly all NULL per row.
-                    -- Beyond being wasteful, DuckDB crashes with
-                    -- "INTERNAL Error: Unsupported type for
-                    -- NumericValueUnionToValue" when querying it.
-                    -- JSON preserves everything and commits to nothing;
-                    -- silver extracts typed columns per event type.
-                    CAST(payload AS JSON) AS payload,
-                    public,
-                    CAST(created_at AS TIMESTAMP) AS created_at,
-                    '{date}' AS dt,
-                    {hour} AS hour
-                FROM read_json_auto('{plain}', union_by_name=true, ignore_errors=true)
-            ) TO '{target}' (FORMAT PARQUET, COMPRESSION ZSTD, OVERWRITE_OR_IGNORE 1)
-        """)
+        con.execute(transform_sql(src, target, date, hour))
 
         rows = con.execute(
             f"SELECT count(*) FROM read_parquet('{target}')"
