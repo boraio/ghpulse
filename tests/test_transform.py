@@ -154,6 +154,9 @@ def main() -> int:
         check("retry-absent redoes a FAILED hour even if its data exists",
               backfill.plan([K[2]], {K[2]: backfill.FAILED}, {K[2]}, "retry-absent"),
               [K[2]]),
+
+        check("force returns a copy, not the caller's list", backfill.plan(K, {}, set(), "force") is not K, True)
+        check("unknown status is redone", backfill.plan([K[0]], {K[0]: "mystery"}, {K[0]}, "resume"), [K[0]]),
     ]
 
     print()
