@@ -99,7 +99,7 @@ def fetch_hour(con: duckdb.DuckDBPyConnection, date: str, hour: int, dry_run: bo
 
     with tempfile.TemporaryDirectory() as tmp:
         gz = Path(tmp) / "events.json.gz"
-        src = Path(tmp) / "events.json"
+        plain = Path(tmp) / "events.json"
 
         try:
             req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
@@ -123,11 +123,11 @@ def fetch_hour(con: duckdb.DuckDBPyConnection, date: str, hour: int, dry_run: bo
         # like head and jq when DuckDB's type inference fails on a bad hour.
         # Note that DuckDB can read .gz files natively, so this step costs
         # approximately 10x the disk space.
-        with gzip.open(gz, "rb") as fin, open(src, "wb") as fout:
+        with gzip.open(gz, "rb") as fin, open(plain, "wb") as fout:
             while chunk := fin.read(1 << 20):
                 fout.write(chunk)
 
-        con.execute(transform_sql(src, target, date, hour))
+        con.execute(transform_sql(plain, target, date, hour))
 
         rows = con.execute(
             f"SELECT count(*) FROM read_parquet('{target}')"
