@@ -84,7 +84,9 @@ def backoff_s(attempt: int, retry_after: float | None = None, rng=random.random)
 
 def too_recent(key: tuple[str, int], now: dt.datetime) -> bool:
     """True if this hour is still inside the publish lag and should not be fetched yet."""
-    return False
+    # The real GH Archive publish lag is unmeasured; 3 hours from the start of the hour is a conservative guess.
+    start = dt.datetime.strptime(key[0], "%Y-%m-%d").replace(hour=key[1], tzinfo=dt.timezone.utc)
+    return start > now - dt.timedelta(hours=3)
 
 
 def classify(exc: Exception) -> str:
