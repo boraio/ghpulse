@@ -17,6 +17,8 @@ def hour_range(start: dt.datetime, end: dt.datetime) -> list[tuple[str, int]]:
         current += dt.timedelta(hours=1)
     return hours
 
+INGESTED, ABSENT, FAILED = "ingested", "absent", "failed"
+
 def partition_key(path: str) -> tuple[str, int]:
     """From a path like s3://b/bronze/events/dt=2026-09-01/hour=05/data.parquet return ('2026-09-01', 5)."""
     parts = path.split('/')
@@ -25,3 +27,14 @@ def partition_key(path: str) -> tuple[str, int]:
     date_iso = date_part.split('=')[1]
     hour = int(hour_part.split('=')[1])
     return (date_iso, hour)
+
+def plan(keys, statuses, present, mode) -> list:
+    """Return the hours to process, in input order."""
+    if mode == "force":
+        return keys
+    elif mode == "resume":
+        return [key for key in keys if key not in statuses or statuses[key] in {FAILED, INGESTED} and key not in present]
+    elif mode == "retry-absent":
+        return [key for key in keys if key not in statuses or statuses[key] in {FAILED, INGESTED, ABSENT} and key not in present]
+    else:
+        raise ValueError(f"Unknown mode: {mode}")
