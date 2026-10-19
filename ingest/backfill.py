@@ -55,6 +55,23 @@ def plan(keys, statuses, present, mode) -> list:
     return result
 
 
+import urllib.error
+import http.client
+import gzip
+import zlib
+
 def classify(exc: Exception) -> str:
     """Decide what to do about an error from downloading or transforming one hour."""
+    if isinstance(exc, urllib.error.HTTPError):
+        code = exc.code
+        if code == 404:
+            return ABSENT
+        elif code in (401, 403):
+            return ABORT
+        elif code == 429 or code >= 500:
+            return RETRY
+        else:
+            return FAIL
+    elif isinstance(exc, (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException, EOFError, gzip.BadGzipFile, zlib.error)):
+        return RETRY
     return FAIL
