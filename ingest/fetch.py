@@ -33,6 +33,12 @@ GHARCHIVE = "https://data.gharchive.org/{date}-{hour}.json.gz"
 USER_AGENT = "ghpulse/0.1 (+https://github.com/boraio/ghpulse)"
 BUCKET = os.environ.get("GHPULSE_BUCKET", "ghpulse")
 
+def gharchive_url(date: str, hour: int) -> str:
+    return GHARCHIVE.format(date=date, hour=hour)
+
+def bronze_path(date: str, hour: int) -> str:
+    return f"s3://{BUCKET}/bronze/events/dt={date}/hour={hour:02d}/data.parquet"
+
 
 def s3_config(con: duckdb.DuckDBPyConnection) -> None:
     """Point DuckDB at RadosGW.
@@ -59,8 +65,8 @@ def s3_config(con: duckdb.DuckDBPyConnection) -> None:
 
 def fetch_hour(con: duckdb.DuckDBPyConnection, date: str, hour: int, dry_run: bool) -> int:
     """Download one hour, write it to bronze, return the row count."""
-    url = GHARCHIVE.format(date=date, hour=hour)
-    target = f"s3://{BUCKET}/bronze/events/dt={date}/hour={hour:02d}/data.parquet"
+    url = gharchive_url(date, hour)
+    target = bronze_path(date, hour)
 
     print(f"  {url}")
     if dry_run:
