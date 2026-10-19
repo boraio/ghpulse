@@ -53,3 +53,8 @@ def plan(keys, statuses, present, mode) -> list:
             result.append(key)
         
     return result
+
+
+def classify(exc: Exception) -> str:
+    """Decide what to do about an error from downloading or transforming one hour."""
+    return FAIL
