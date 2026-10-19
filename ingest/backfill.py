@@ -47,7 +47,7 @@ def plan(keys, statuses, present, mode) -> list:
             result.append(key)
         elif status == INGESTED and key not in present:
             result.append(key)
-        else:
+        elif status == ABSENT and mode == "retry-absent":
             result.append(key)
         
     return result
