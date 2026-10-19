@@ -18,6 +18,8 @@ def hour_range(start: dt.datetime, end: dt.datetime) -> list[tuple[str, int]]:
     return hours
 
 INGESTED, ABSENT, FAILED = "ingested", "absent", "failed"
+# Outcomes of classify(). A 404 is reported as ABSENT, reusing the marker status.
+RETRY, FAIL, ABORT = "retry", "fail", "abort"
 
 def partition_key(path: str) -> tuple[str, int]:
     """From a path like s3://b/bronze/events/dt=2026-09-01/hour=05/data.parquet return ('2026-09-01', 5)."""
