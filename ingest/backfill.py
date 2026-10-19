@@ -35,6 +35,6 @@ def plan(keys, statuses, present, mode) -> list:
     elif mode == "resume":
         return [key for key in keys if key not in statuses or statuses[key] == FAILED or (statuses[key] == INGESTED and key not in present)]
     elif mode == "retry-absent":
-        return [key for key in keys if key not in statuses or statuses[key] in {FAILED, INGESTED, ABSENT} and key not in present]
+        return [key for key in keys if key not in statuses or statuses[key] in {FAILED, ABSENT} and key not in present]
     else:
         raise ValueError(f"Unknown mode: {mode}")
