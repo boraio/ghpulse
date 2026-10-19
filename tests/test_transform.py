@@ -147,6 +147,12 @@ def main() -> int:
               backfill.dt.datetime(2026, 9, 1, 5, tzinfo=backfill.dt.timezone.utc)),
     ]
 
+    results += [
+        check("resume redoes a FAILED hour even if its data exists",
+              backfill.plan(K, {K[2]: backfill.FAILED}, {K[2]}, "resume"),
+              [K[2]]),
+    ]
+
     print()
     if all(results):
         print("all checks passed")
