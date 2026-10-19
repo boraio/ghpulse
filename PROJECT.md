@@ -89,7 +89,7 @@ Done and verified offline:
 
 Not yet written: download, decompress, marker read/write, the per-hour worker,
 the CLI, and the first real run. Decisions, remaining work and open unknowns
-are in **`claude/milestone_01_step0.md`**.
+are in **`milestone_01_step0.md`**.
 
 ## Milestones
 
@@ -104,7 +104,7 @@ See **`milestone_01.md`** for scope, the four open decisions, order of work and
 exit criteria. In short: a resumable backfill with a manifest, a week ingested
 and measured before committing to a month, silver tables for the four
 funnel-relevant event types, and a `most-popular` baseline evaluated on a
-temporal split. Progress on step 0 is in `claude/milestone_01_step0.md`.
+temporal split. Progress on step 0 is in `milestone_01_step0.md`.
 
 ### Milestone 2 — the recommender
 

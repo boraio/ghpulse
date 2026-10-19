@@ -130,7 +130,7 @@ to the September week, which is six weeks old.
   that the next commit fixed, and a restore commit. Squash before merging. That
   rewrites history, so it is a deliberate step, taken before anything is pushed.
 - **Repo copies of the docs.** The repo tracks its own `PROJECT.md` and
-  `milestone_01.md`; the Claude project copies were updated first. Whether the
+  `milestone_01.md`; the copies kept outside the repo were updated first. Whether the
   two were identical before is not known, so review `git diff` before
   committing any sync.
 
