@@ -198,6 +198,10 @@ def main() -> int:
         check("URLError retries", C(urllib.error.URLError("x")), backfill.RETRY),
         check("unexpected error fails without retry", C(ValueError("x")), backfill.FAIL),
         check("a local file error fails without retry", C(FileNotFoundError("x")), backfill.FAIL),
+        check("partition_key rejects a path with no dt= segment", raises(ValueError, lambda: backfill.partition_key('s3://b/bronze/events/hour=05/data.parquet')), True),
+        check("partition_key rejects a path with no hour= segment", raises(ValueError, lambda: backfill.partition_key('s3://b/bronze/events/dt=2026-09-01/data.parquet')), True),
+        check("partition_key rejects a non-numeric hour", raises(ValueError, lambda: backfill.partition_key('s3://b/bronze/events/dt=2026-09-01/hour=xx/data.parquet')), True),
+        check("hour_range with end before start raises ValueError (checked without the placeholder)", raises(ValueError, lambda: backfill.hour_range(backfill.parse_hour('2026-09-02T01'), backfill.parse_hour('2026-09-01T23'))), True),
         check("incomplete reads retry", C(http.client.IncompleteRead(b"")), backfill.RETRY),
         check("corrupt gzip stream errors retry", C(zlib.error("x")), backfill.RETRY),
     ]
