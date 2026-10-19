@@ -61,6 +61,21 @@ import http.client
 import gzip
 import zlib
 
+def count_lines(chunks) -> int:
+    """Count lines across an iterable of bytes chunks. A final line without a trailing newline counts."""
+    return -1
+
+
+def backoff_s(attempt: int, retry_after: float | None = None, rng=random.random) -> float:
+    """Seconds to wait before retry number attempt (0-based): exponential with jitter, never less than retry_after."""
+    return -1.0
+
+
+def too_recent(key: tuple[str, int], now: dt.datetime) -> bool:
+    """True if this hour is still inside the publish lag and should not be fetched yet."""
+    return False
+
+
 def classify(exc: Exception) -> str:
     """Decide what to do about an error from downloading or transforming one hour."""
     if isinstance(exc, urllib.error.HTTPError):
