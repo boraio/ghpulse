@@ -63,7 +63,15 @@ import zlib
 
 def count_lines(chunks) -> int:
     """Count lines across an iterable of bytes chunks. A final line without a trailing newline counts."""
-    return -1
+    count = 0
+    last_byte = b""
+    for chunk in chunks:
+        count += chunk.count(b"\n")
+        if chunk:
+            last_byte = chunk[-1:]
+    if last_byte and last_byte != b"\n":
+        count += 1
+    return count
 
 
 def backoff_s(attempt: int, retry_after: float | None = None, rng=random.random) -> float:
