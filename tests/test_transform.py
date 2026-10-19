@@ -149,7 +149,10 @@ def main() -> int:
 
     results += [
         check("resume redoes a FAILED hour even if its data exists",
-              backfill.plan(K, {K[2]: backfill.FAILED}, {K[2]}, "resume"),
+              backfill.plan([K[2]], {K[2]: backfill.FAILED}, {K[2]}, "resume"),
+              [K[2]]),
+        check("retry-absent redoes a FAILED hour even if its data exists",
+              backfill.plan([K[2]], {K[2]: backfill.FAILED}, {K[2]}, "retry-absent"),
               [K[2]]),
     ]
 
