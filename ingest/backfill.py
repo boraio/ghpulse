@@ -1,5 +1,6 @@
 """Backfill logic for GH Archive hours, keyed by (date_iso, hour) in UTC: planning, error classification, retry timing and line counting. No I/O, so tests/test_transform.py exercises it offline."""
 from __future__ import annotations
+
 import datetime as dt
 import gzip
 import http.client
@@ -7,10 +8,11 @@ import random
 import urllib.error
 import zlib
 
+
 def parse_hour(s: str) -> dt.datetime:
     """Parse 'YYYY-MM-DDTHH' (e.g. 2026-09-01T05) into a timezone-aware UTC datetime."""
     naive = dt.datetime.strptime(s, '%Y-%m-%dT%H')
-    return dt.datetime(naive.year, naive.month, naive.day, naive.hour, tzinfo=dt.timezone.utc)
+    return dt.datetime(naive.year, naive.month, naive.day, naive.hour, tzinfo=dt.UTC)
 
 def hour_range(start: dt.datetime, end: dt.datetime) -> list[tuple[str, int]]:
     """Inclusive list of (date_iso, hour) pairs, one per hour from start to end."""
@@ -49,13 +51,15 @@ def plan(keys, statuses, present, mode) -> list:
     result = []
     for key in keys:
         status = statuses.get(key)
-        if status is None:
+        # Separate branches on purpose: a merged or/and version of this chain
+        # once hid an operator-precedence bug, so SIM114 is suppressed here.
+        if status is None:  # noqa: SIM114
             result.append(key)
-        elif status == FAILED:
+        elif status == FAILED:  # noqa: SIM114
             result.append(key)
-        elif status not in {INGESTED, ABSENT}:
+        elif status not in {INGESTED, ABSENT}:  # noqa: SIM114
             result.append(key)
-        elif status == INGESTED and key not in present:
+        elif status == INGESTED and key not in present:  # noqa: SIM114
             result.append(key)
         elif status == ABSENT and mode == "retry-absent":
             result.append(key)
@@ -87,7 +91,7 @@ def backoff_s(attempt: int, retry_after: float | None = None, rng=random.random)
 def too_recent(key: tuple[str, int], now: dt.datetime) -> bool:
     """True if this hour is still inside the publish lag and should not be fetched yet."""
     # The real GH Archive publish lag is unmeasured; 3 hours from the start of the hour is a conservative guess.
-    start = dt.datetime.strptime(key[0], "%Y-%m-%d").replace(hour=key[1], tzinfo=dt.timezone.utc)
+    start = dt.datetime.strptime(key[0], "%Y-%m-%d").replace(hour=key[1], tzinfo=dt.UTC)
     return start > now - dt.timedelta(hours=3)
 
 

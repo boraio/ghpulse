@@ -27,7 +27,7 @@ jobs:
       - name: Install
         run: |
           pip install --quiet -r requirements.txt
-          pip install --quiet ruff
+          pip install --quiet -r requirements-dev.txt
 
       - name: Lint
         run: ruff check ingest/
