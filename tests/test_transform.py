@@ -161,6 +161,8 @@ def main() -> int:
 
     import gzip
     import urllib.error
+    import http.client
+    import zlib
 
     def http_error(code):
         return urllib.error.HTTPError("https://example.invalid", code, "x", {}, None)
