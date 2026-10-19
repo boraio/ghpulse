@@ -107,6 +107,27 @@ def main() -> int:
                 "WHERE actor.login LIKE '%[bot]'"), 1),
     ]
 
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ingest"))
+    import backfill
+
+    results += [
+        check("hour_range from parse_hour('2026-09-01T23') to parse_hour('2026-09-02T01') equals [('2026-09-01', 23), ('2026-09-02', 0), ('2026-09-02', 1)]",
+              backfill.hour_range(backfill.parse_hour('2026-09-01T23'), backfill.parse_hour('2026-09-02T01')),
+              [('2026-09-01', 23), ('2026-09-02', 0), ('2026-09-02', 1)]),
+        check("partition_key('s3://b/bronze/events/dt=2026-09-01/hour=05/data.parquet') equals ('2026-09-01', 5)",
+              backfill.partition_key('s3://b/bronze/events/dt=2026-09-01/hour=05/data.parquet'),
+              ('2026-09-01', 5)),
+        check("hour_range with end before start raises ValueError",
+              True,
+              True),
+    ]
+
+    try:
+        backfill.hour_range(backfill.parse_hour('2026-09-02T01'), backfill.parse_hour('2026-09-01T23'))
+        results[-1] = False
+    except ValueError:
+        results[-1] = True
+
     print()
     if all(results):
         print("all checks passed")
