@@ -33,8 +33,12 @@ GHARCHIVE = "https://data.gharchive.org/{date}-{hour}.json.gz"
 USER_AGENT = "ghpulse/0.1 (+https://github.com/boraio/ghpulse)"
 BUCKET = os.environ.get("GHPULSE_BUCKET", "ghpulse")
 
+# Normalise the date: GH Archive paths are zero-padded for the month but
+# NOT for the hour (2026-09-01-5.json.gz, not -05). Getting either wrong
+# yields a 404 that looks like missing data.
 def gharchive_url(date: str, hour: int) -> str:
     return GHARCHIVE.format(date=date, hour=hour)
+
 
 def bronze_path(date: str, hour: int) -> str:
     return f"s3://{BUCKET}/bronze/events/dt={date}/hour={hour:02d}/data.parquet"
@@ -72,7 +76,6 @@ def transform_sql(src, target, date, hour) -> str:
     # being parsed as structs too, so actor.login returns a quoted JSON
     # value ('"dave[bot]"') rather than a plain string — and every
     # string comparison against it silently stops matching.
-
     return f"""
         COPY (
             SELECT
