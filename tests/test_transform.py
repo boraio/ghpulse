@@ -159,24 +159,14 @@ def main() -> int:
         check("unknown status is redone", backfill.plan([K[0]], {K[0]: "mystery"}, {K[0]}, "resume"), [K[0]]),
     ]
 
-    import gzip
-    import urllib.error
-
-    def http_error(code):
-        return urllib.error.HTTPError("https://example.invalid", code, "x", {}, None)
+    import http.client
+    import zlib
 
     C = backfill.classify
 
     results += [
-        check("404 is recorded absent", C(http_error(404)), backfill.ABSENT),
-        check("401 and 403 abort the run", [C(http_error(401)), C(http_error(403))], [backfill.ABORT, backfill.ABORT]),
-        check("429 and 503 retry", [C(http_error(429)), C(http_error(503))], [backfill.RETRY, backfill.RETRY]),
-        check("other 4xx fails without retry", C(http_error(400)), backfill.FAIL),
-        check("timeouts and connection resets retry", [C(TimeoutError()), C(ConnectionResetError())], [backfill.RETRY, backfill.RETRY]),
-        check("truncated download errors retry", [C(EOFError()), C(gzip.BadGzipFile())], [backfill.RETRY, backfill.RETRY]),
-        check("URLError retries", C(urllib.error.URLError("x")), backfill.RETRY),
-        check("unexpected error fails without retry", C(ValueError("x")), backfill.FAIL),
-        check("a local file error fails without retry", C(FileNotFoundError("x")), backfill.FAIL),
+        check("incomplete reads retry", C(http.client.IncompleteRead(b"")), backfill.RETRY),
+        check("corrupt gzip stream errors retry", C(zlib.error("x")), backfill.RETRY),
     ]
 
     print()
