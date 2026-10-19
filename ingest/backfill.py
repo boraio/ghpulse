@@ -60,12 +60,6 @@ def plan(keys, statuses, present, mode) -> list:
     return result
 
 
-import random
-import urllib.error
-import http.client
-import gzip
-import zlib
-
 def count_lines(chunks) -> int:
     """Count lines across an iterable of bytes chunks. A final line without a trailing newline counts."""
     count = 0
