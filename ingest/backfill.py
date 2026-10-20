@@ -140,15 +140,14 @@ def marker_path(root: str, dt_iso: str, hour: int) -> str:
 
 def write_marker(con, path: str, record: dict) -> None:
     """Write one marker record as JSON to path (local or s3://) via DuckDB."""
-    if not path.startswith("s3://"):
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
-            json.dump(record, f)
-            local = f.name
-        try:
-            con.execute(f"COPY (SELECT * FROM read_json('{local}')) TO '{path}' (FORMAT JSON)")
-        finally:
-            os.unlink(local)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+        json.dump(record, f)
+        local = f.name
+    try:
+        con.execute(f"COPY (SELECT * FROM read_json('{local}')) TO '{path}' (FORMAT JSON)")
+    finally:
+        os.unlink(local)
 
 def read_marker(con, path: str) -> dict | None:
     """Read one marker back as a dict, or None if it is empty."""
