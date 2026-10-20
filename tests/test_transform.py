@@ -179,6 +179,30 @@ def main() -> int:
 
     C = backfill.classify
 
+    import io
+
+    class FakeResponse:
+        def __init__(self, body, length):
+            self._body = io.BytesIO(body)
+            self.headers = {"Content-Length": str(length)}
+
+        def read(self, n=-1):
+            return self._body.read(n)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    seen = {}
+
+    def fake_opener(body, length):
+        def opener(req, timeout):
+            seen["ua"] = req.get_header("User-agent")
+            return FakeResponse(body, length)
+        return opener
+
     def raises(exc_type, fn):
         try:
             fn()
