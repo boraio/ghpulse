@@ -136,7 +136,7 @@ def decompress(gz, dest) -> int:
 
 def marker_path(root: str, dt_iso: str, hour: int) -> str:
     """Manifest marker location for one hour; the hour is zero-padded like bronze paths."""
-    return ""
+    return f"{root}/dt={dt_iso}/hour={hour:02d}/status.json"
 
 def write_marker(con, path: str, record: dict) -> None:
     """Write one marker record as JSON to path (local or s3://) via DuckDB."""
