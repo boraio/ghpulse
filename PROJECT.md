@@ -237,8 +237,7 @@ wrong in milestone 1 step 0.
   Run the suite in the other pane.
 - `/diff` goes through `less` and hides its output; use
   `git --no-pager diff`.
-- aider commits every edit, so the branch fills with small commits. It is
-  local; squash before merging, as a deliberate history rewrite.
+- aider commits every edit, so the branch fills with small commits. Merge with GitHub's "Squash and merge" (enabled on the repo), so `main` gets one commit and the pushed branch is never rewritten.
 - Observed limits: context of 16384 tokens per slot and a 4096-token output
   cap.
 - **Temperature is set explicitly to `0.0`** in `.aider.model.settings.yml`
