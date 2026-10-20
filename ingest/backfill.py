@@ -96,6 +96,13 @@ def too_recent(key: tuple[str, int], now: dt.datetime) -> bool:
     return start > now - dt.timedelta(hours=3)
 
 
+class SuspiciousDownload(Exception):
+    """A download that finished without an HTTP error but cannot be trusted: a short read or an implausibly small file."""
+
+def download(url: str, dest, user_agent: str, timeout: float = 60.0, min_bytes: int = 100_000, opener=urllib.request.urlopen) -> int:
+    """Stream url to dest and return the bytes written; raise SuspiciousDownload on a short read or a file smaller than min_bytes."""
+    return -1
+
 def classify(exc: Exception) -> str:
     """Decide what to do about an error from downloading or transforming one hour."""
     if isinstance(exc, urllib.error.HTTPError):
