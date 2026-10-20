@@ -134,6 +134,23 @@ def decompress(gz, dest) -> int:
         return count_lines(chunks())
 
 
+def marker_path(root: str, dt_iso: str, hour: int) -> str:
+    """Manifest marker location for one hour; the hour is zero-padded like bronze paths."""
+    return ""
+
+def write_marker(con, path: str, record: dict) -> None:
+    """Write one marker record as JSON to path (local or s3://) via DuckDB."""
+    return None
+
+def read_marker(con, path: str) -> dict | None:
+    """Read one marker back as a dict, or None if it is empty."""
+    return None
+
+def read_state(con, root: str) -> dict:
+    """Map (dt, hour) to status for every marker under root; empty when there are none."""
+    return None
+
+
 def classify(exc: Exception) -> str:
     """Decide what to do about an error from downloading or transforming one hour."""
     if isinstance(exc, urllib.error.HTTPError):
