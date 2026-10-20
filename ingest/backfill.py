@@ -101,7 +101,21 @@ class SuspiciousDownload(Exception):
 
 def download(url: str, dest, user_agent: str, timeout: float = 60.0, min_bytes: int = 100_000, opener=urllib.request.urlopen) -> int:
     """Stream url to dest and return the bytes written; raise SuspiciousDownload on a short read or a file smaller than min_bytes."""
-    return -1
+    req = urllib.request.Request(url, headers={"User-Agent": user_agent})
+    n = 0
+    with opener(req, timeout=timeout) as resp, open(dest, "wb") as out:
+        expected = resp.headers.get("Content-Length")
+        while True:
+            chunk = resp.read(1 << 20)
+            if not chunk:
+                break
+            out.write(chunk)
+            n += len(chunk)
+    if expected is not None and int(expected) != n:
+        raise SuspiciousDownload(f"short read: {n} of {expected} bytes from {url}")
+    if n < min_bytes:
+        raise SuspiciousDownload(f"only {n} bytes from {url}")
+    return n
 
 def classify(exc: Exception) -> str:
     """Decide what to do about an error from downloading or transforming one hour."""
