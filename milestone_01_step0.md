@@ -73,6 +73,7 @@ to the September week, which is six weeks old.
   and the file was restored from the known-good commit.
 - aider's temperature setting verified end to end (see `PROJECT.md`, aider
   notes): now `0.0`, confirmed arriving at the server.
+- Draft PR #1 open; CI green with pinned ruff 0.17.1 (its default rules, via `ruff.toml` and `requirements-dev.txt`), `compileall`, and the offline checks now running in CI.
 
 ## Remaining, in order
 
