@@ -6,6 +6,7 @@ import gzip
 import http.client
 import random
 import urllib.error
+import urllib.request
 import zlib
 
 
