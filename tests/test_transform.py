@@ -211,6 +211,14 @@ def main() -> int:
             path.write_bytes(blob[: len(blob) // 2])
         return path
 
+    class FakeCon:
+        def __init__(self):
+            self.sql = []
+
+        def execute(self, sql):
+            self.sql.append(sql)
+            return self
+
     def raises(exc_type, fn):
         try:
             fn()
