@@ -119,7 +119,16 @@ def download(url: str, dest, user_agent: str, timeout: float = 60.0, min_bytes: 
 
 def decompress(gz, dest) -> int:
     """Stream the gzip file gz into the plain file dest and return its line count, counted the same way as count_lines."""
-    return -1
+    with gzip.open(gz, "rb") as fin, open(dest, "wb") as fout:
+        def chunks():
+            while True:
+                chunk = fin.read(1 << 20)
+                if not chunk:
+                    break
+                fout.write(chunk)
+                yield chunk
+
+        return count_lines(chunks())
 
 
 def classify(exc: Exception) -> str:
