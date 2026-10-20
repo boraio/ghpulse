@@ -152,7 +152,13 @@ def write_marker(con, path: str, record: dict) -> None:
 
 def read_marker(con, path: str) -> dict | None:
     """Read one marker back as a dict, or None if it is empty."""
-    return None
+    cols = "{'dt': 'VARCHAR', 'hour': 'INTEGER', 'status': 'VARCHAR', 'rows': 'BIGINT', 'source_lines': 'BIGINT', 'attempts': 'INTEGER', 'error': 'VARCHAR', 'finished_at': 'VARCHAR', 'code_version': 'VARCHAR'}"
+    cur = con.execute(f"SELECT * FROM read_json('{path}', columns={cols}, hive_partitioning=false)")
+    row = cur.fetchone()
+    if row is None:
+        return None
+    else:
+        return dict(zip([d[0] for d in cur.description], row))
 
 def read_state(con, root: str) -> dict:
     """Map (dt, hour) to status for every marker under root; empty when there are none."""
