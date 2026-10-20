@@ -129,6 +129,6 @@ def classify(exc: Exception) -> str:
             return RETRY
         else:
             return FAIL
-    elif isinstance(exc, (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException, EOFError, gzip.BadGzipFile, zlib.error)):
+    elif isinstance(exc, (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException, EOFError, gzip.BadGzipFile, zlib.error, SuspiciousDownload)):
         return RETRY
     return FAIL
