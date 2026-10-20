@@ -162,7 +162,13 @@ def read_marker(con, path: str) -> dict | None:
 
 def read_state(con, root: str) -> dict:
     """Map (dt, hour) to status for every marker under root; empty when there are none."""
-    return None
+    pattern = f"{root}/*/*/status.json"
+    if con.execute(f"SELECT 1 FROM glob('{pattern}') LIMIT 1").fetchall() == []:
+        return {}
+    else:
+        cols = "{'dt': 'VARCHAR', 'hour': 'INTEGER', 'status': 'VARCHAR'}"
+        rows = con.execute(f"SELECT dt, hour, status FROM read_json('{pattern}', columns={cols}, hive_partitioning=false)").fetchall()
+        return {(dt, hour): status for dt, hour, status in rows}
 
 
 def classify(exc: Exception) -> str:
