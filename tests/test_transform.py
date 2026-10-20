@@ -203,6 +203,14 @@ def main() -> int:
             return FakeResponse(body, length)
         return opener
 
+    def make_gz(path, data, cut=False):
+        with gzip.open(path, "wb") as f:
+            f.write(data)
+        if cut:
+            blob = path.read_bytes()
+            path.write_bytes(blob[: len(blob) // 2])
+        return path
+
     def raises(exc_type, fn):
         try:
             fn()
