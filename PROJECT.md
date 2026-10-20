@@ -203,7 +203,8 @@ Each of these cost real time. Do not relitigate them without evidence.
   resolves the system binaries and reports misleading failures. This includes
   the pane used for acceptance checks: without the venv, `python` is missing
   and the FAIL/PASS counts both print 0 (a PASS count of 0 is the tell).
-- Dependencies in `requirements.txt`; dev tools in `requirements-dev.txt`.
+- Dependencies in `requirements.txt`; dev tools in `requirements-dev.txt` (which pulls in `requirements.txt` and pins `ruff==0.17.1`; CI installs it).
+- Lint: `ruff.toml` sets only `target-version = "py312"`, so the rule set is the pinned ruff version's default (407 rules at 0.17.1). Changing the pin is the only thing that changes the rules; review the lint output when bumping it. The `# noqa: SIM114` lines in `plan()` are deliberate: the merge ruff suggests is the `A or B and C` shape that once hid a bug there.
 - Comments explain **why**, not what the next line does. Never state a claim
   about a tool's behaviour that hasn't been verified.
 - Secrets live in `/etc/jenga.env`, loaded via shell helpers. `.gitignore`
