@@ -127,9 +127,7 @@ to the September week, which is six weeks old.
   51,582 events and about 5.9 MB of Parquet; a single fetch took about 3.6 s
   wall with a peak of about 370 MB resident, on a 32-core, 440 GB host. The
   step 2 measurement supersedes the size figure.
-- **Branch history** is many small aider commits, one commit with a syntax error
-  that the next commit fixed, and a restore commit. Squash before merging. That
-  rewrites history, so it is a deliberate step, taken before anything is pushed.
+- **Branch history** is many small aider commits, one commit with a syntax error that the next commit fixed, and a restore commit. Resolved without a rewrite: the branch is pushed as-is and will merge with "Squash and merge".
 - **Repo copies of the docs.** The repo tracks its own `PROJECT.md` and
   `milestone_01.md`; the copies kept outside the repo were updated first. Whether the
   two were identical before is not known, so review `git diff` before
