@@ -128,10 +128,7 @@ to the September week, which is six weeks old.
   wall with a peak of about 370 MB resident, on a 32-core, 440 GB host. The
   step 2 measurement supersedes the size figure.
 - **Branch history** is many small aider commits, one commit with a syntax error that the next commit fixed, and a restore commit. Resolved without a rewrite: the branch is pushed as-is and will merge with "Squash and merge".
-- **Repo copies of the docs.** The repo tracks its own `PROJECT.md` and
-  `milestone_01.md`; the copies kept outside the repo were updated first. Whether the
-  two were identical before is not known, so review `git diff` before
-  committing any sync.
+- **Repo copies of the docs** were synced on 2026-10-19 (`PROJECT.md` and this page; the repo had matched the original project copy). Keep both in step when either changes.
 
 ## Step 0 is done when
 
