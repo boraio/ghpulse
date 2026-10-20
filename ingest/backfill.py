@@ -4,6 +4,9 @@ from __future__ import annotations
 import datetime as dt
 import gzip
 import http.client
+import json
+import os
+import tempfile
 import random
 import urllib.error
 import urllib.request
