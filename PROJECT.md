@@ -215,6 +215,7 @@ Each of these cost real time. Do not relitigate them without evidence.
 Code is written by aider with the local model; these rules come from what went
 wrong in milestone 1 step 0.
 
+- **aider first, always.** Every change to code, config or docs is attempted through aider first. An assert-guarded script or `sed` is the fallback only after aider has failed to apply an edit, and is said so in the commit.
 - **One change per prompt, one anchor per edit.** An edit that touches two
   places (an import at the top and code far below) is split into two prompts.
   Multi-part prompts overran the 4096-token output cap and produced bad commits.
