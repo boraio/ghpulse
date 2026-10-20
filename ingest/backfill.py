@@ -6,8 +6,8 @@ import gzip
 import http.client
 import json
 import os
-import tempfile
 import random
+import tempfile
 import urllib.error
 import urllib.request
 import zlib
