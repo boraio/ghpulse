@@ -1,4 +1,4 @@
-"""Backfill logic for GH Archive hours, keyed by (date_iso, hour) in UTC: planning, error classification, retry timing and line counting. No I/O, so tests/test_transform.py exercises it offline."""
+"""Backfill logic for GH Archive hours, keyed by (date_iso, hour) in UTC: planning, error classification, retry timing, line counting and downloading. Downloads take an injectable opener, so tests/test_transform.py stays offline."""
 from __future__ import annotations
 
 import datetime as dt
