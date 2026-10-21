@@ -1,24 +1,24 @@
 """Backfill logic for GH Archive hours, keyed by (date_iso, hour) in UTC: planning, error classification, retry timing, line counting and downloading. Downloads take an injectable opener, so tests/test_transform.py stays offline."""
 from __future__ import annotations
 
+import argparse
 import datetime as dt
 import gzip
 import http.client
 import json
+import multiprocessing
 import os
 import random
+import subprocess
+import sys
 import tempfile
 import time
 import urllib.error
 import urllib.request
 import zlib
-import argparse
-import multiprocessing
-import subprocess
-import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
-import duckdb
 
+import duckdb
 import fetch
 
 
