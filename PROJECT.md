@@ -91,7 +91,7 @@ Done and verified offline:
 
 - Pushed as draft PR #1 (`backfill-mechanics` → `main`). CI is green: ruff lint with the pinned version, `compileall`, and the offline checks, so the checks are verified on a clean runner, not only locally.
 
-Not yet written: download, decompress, marker read/write, the per-hour worker,
+Not yet written: listing which bronze partitions exist, the per-hour worker,
 the CLI, and the first real run. Decisions, remaining work and open unknowns
 are in **`milestone_01_step0.md`**.
 
