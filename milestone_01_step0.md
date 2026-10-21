@@ -77,13 +77,7 @@ to the September week, which is six weeks old.
 
 ## Remaining, in order
 
-1. **Side-effect pieces**, each with offline checks: download (timeout,
-   `Content-Length` check, minimum-size check, a `SuspiciousDownload` error),
-   decompress to disk returning the line count via `count_lines`, read state
-   (listing markers), write marker (local temp file, then DuckDB `COPY ... TO
-   ... (FORMAT JSON)`), the per-hour worker `ingest_one` (retry loop, marker
-   written after data), and a `code_version` stamp in the marker. When these
-   land, reword the module docstring, which currently says "No I/O".
+1. **Remaining side-effect pieces**, each test-first: list which bronze partitions exist (the `present` set for `plan()`, via `glob()` and `partition_key`), and the per-hour worker `ingest_one`: download into a temporary directory (so a partial file from a `SuspiciousDownload` is discarded), decompress, transform, then write the marker after the data, with a retry loop using `backoff_s` and `classify`, and `finished_at` and a `code_version` stamp in the marker.
 2. **CLI**: `--start`, `--end`, `--workers`, `--retry-absent`, `--force --yes`,
    `--dry-run`, `--status`.
 3. **Pilot and run.** 6 hours at 1 worker then 4 and compare throughput. Then
