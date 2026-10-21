@@ -12,6 +12,12 @@ import time
 import urllib.error
 import urllib.request
 import zlib
+import argparse
+import multiprocessing
+import subprocess
+import sys
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import duckdb
 
 import fetch
 
