@@ -253,7 +253,7 @@ def status_counts(keys, statuses, present) -> dict:
 
 def exit_code(records) -> int:
     """1 if any hour failed, else 0."""
-    return -1
+    return 1 if any(r.get("status") == FAILED for r in records) else 0
 
 
 def classify(exc: Exception) -> str:
