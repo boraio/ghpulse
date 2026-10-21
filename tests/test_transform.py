@@ -243,6 +243,8 @@ def main() -> int:
         check("URLError retries", C(urllib.error.URLError("x")), backfill.RETRY),
         check("unexpected error fails without retry", C(ValueError("x")), backfill.FAIL),
         check("a local file error fails without retry", C(FileNotFoundError("x")), backfill.FAIL),
+        check("present_partitions with no data is empty", backfill.present_partitions(con, str(tmp / "bronze_empty")), set()),
+        check("present_partitions finds data.parquet files and ignores others", (touch(tmp / "bronze" / "dt=2026-09-01" / "hour=00" / "data.parquet"), touch(tmp / "bronze" / "dt=2026-09-01" / "hour=05" / "data.parquet"), touch(tmp / "bronze" / "dt=2026-09-01" / "hour=07" / "notes.txt"), backfill.present_partitions(con, str(tmp / "bronze")))[-1], {("2026-09-01", 0), ("2026-09-01", 5)}),
         check("write_marker copies to an s3:// path too", (lambda fc: (backfill.write_marker(fc, "s3://bucket/m/status.json", {"dt": "2026-09-01", "hour": 5, "status": backfill.INGESTED}), any("COPY" in s and "s3://bucket/m/status.json" in s for s in fc.sql))[-1])(FakeCon()), True),
         check("write_marker creates no local directory for an s3:// path", Path("s3:").exists(), False),
         check("marker path zero-pads the hour", backfill.marker_path("s3://ghpulse/_manifest/events", "2026-09-01", 5), "s3://ghpulse/_manifest/events/dt=2026-09-01/hour=05/status.json"),
