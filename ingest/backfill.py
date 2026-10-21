@@ -287,7 +287,27 @@ def _worker(job) -> dict:
 
 def run_pool(todo, bronze_root: str, manifest_root: str, workers: int) -> int:
     """Ingest the planned hours with a spawn-based process pool; returns the exit code (2 on abort)."""
-    return -1
+    if not todo:
+        return 0
+    threads = max(1, (os.cpu_count() or 1) // workers)
+    version = code_version()
+    records = []
+    ctx = multiprocessing.get_context("spawn")
+    with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as pool:
+        futures = [pool.submit(_worker, (key, bronze_root, manifest_root, threads, version)) for key in todo]
+        for fut in as_completed(futures):
+            rec = fut.result()
+            records.append(rec)
+            print(f"  {rec['dt']} {rec['hour']:02d} {rec['status']} rows={rec.get('rows')} attempts={rec.get('attempts')}")
+            if rec.get("abort"):
+                print(f"aborting: {rec['error']}", file=sys.stderr)
+                pool.shutdown(cancel_futures=True)
+                return 2
+    absent = sum(1 for r in records if r["status"] == ABSENT)
+    if absent > 3:
+        print(f"warning: {absent} hours absent upstream", file=sys.stderr)
+    print(f"done: {len(records)} hours, {absent} absent, {sum(1 for r in records if r['status'] == FAILED)} failed")
+    return exit_code(records)
 
 def main(argv=None) -> int:
     """CLI entry point; see --help."""
