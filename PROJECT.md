@@ -89,7 +89,7 @@ Done and verified offline:
 
 - Side-effect pieces, each test-first and then checked live: `download` (User-Agent required, injectable opener, `SuspiciousDownload` on a short read or a file under 100,000 bytes, classified as retry), `decompress` (line count via `count_lines`), and the manifest functions `marker_path`, `write_marker`, `read_marker`, `read_state`. Live: the downloaded byte count equalled the server's `Content-Length`; markers were written, overwritten and read back on RadosGW under a scratch prefix. The suite is at 60 PASS, 0 FAIL.
 
-- Pushed as draft PR #1 (`backfill-mechanics` → `main`). CI is green: ruff lint with the pinned version, `compileall`, and the offline checks, so the 45 checks are verified on a clean runner, not only locally.
+- Pushed as draft PR #1 (`backfill-mechanics` → `main`). CI is green: ruff lint with the pinned version, `compileall`, and the offline checks, so the checks are verified on a clean runner, not only locally.
 
 Not yet written: download, decompress, marker read/write, the per-hour worker,
 the CLI, and the first real run. Decisions, remaining work and open unknowns
