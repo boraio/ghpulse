@@ -171,6 +171,11 @@ def read_state(con, root: str) -> dict:
         return {(dt, hour): status for dt, hour, status in rows}
 
 
+def present_partitions(con, bronze_root: str) -> set:
+    """The (dt, hour) keys of every data.parquet under bronze_root; empty when there are none."""
+    return None
+
+
 def classify(exc: Exception) -> str:
     """Decide what to do about an error from downloading or transforming one hour."""
     if isinstance(exc, urllib.error.HTTPError):
