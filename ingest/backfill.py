@@ -279,7 +279,8 @@ def _worker(job) -> dict:
         fetch.s3_config(con)
     try:
         return ingest_one(con, key, bronze_root=bronze_root, manifest_root=manifest_root, user_agent=fetch.USER_AGENT, code_version=version)
-    except Exception as exc:
+    # A worker must return a record rather than raise across the process pool.
+    except Exception as exc:  # noqa: BLE001
         return {"dt": key[0], "hour": key[1], "status": FAILED, "rows": None, "attempts": None, "error": repr(exc)[:500], "abort": classify(exc) == ABORT}
 
 def run_pool(todo, bronze_root: str, manifest_root: str, workers: int) -> int:
