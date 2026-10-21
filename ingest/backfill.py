@@ -275,7 +275,15 @@ def code_version() -> str:
 
 def _worker(job) -> dict:
     """Process-pool entry point: one DuckDB connection per worker, then ingest_one(). Always returns a dict, never raises."""
-    return None
+    key, bronze_root, manifest_root, threads, version = job
+    con = duckdb.connect()
+    con.execute(f"SET threads={threads}")
+    if bronze_root.startswith("s3://") or manifest_root.startswith("s3://"):
+        fetch.s3_config(con)
+    try:
+        return ingest_one(con, key, bronze_root=bronze_root, manifest_root=manifest_root, user_agent=fetch.USER_AGENT, code_version=version)
+    except Exception as exc:
+        return {"dt": key[0], "hour": key[1], "status": FAILED, "rows": None, "attempts": None, "error": repr(exc)[:500], "abort": classify(exc) == ABORT}
 
 def run_pool(todo, bronze_root: str, manifest_root: str, workers: int) -> int:
     """Ingest the planned hours with a spawn-based process pool; returns the exit code (2 on abort)."""
