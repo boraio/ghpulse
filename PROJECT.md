@@ -169,6 +169,7 @@ Each of these cost real time. Do not relitigate them without evidence.
   like missing data. Our own bronze paths do zero-pad the hour (`hour=05`).
 - **GH Archive 403s `urllib` without a `User-Agent` header**, while returning
   200 to curl for the same URL.
+- **GH Archive hourly files end without a trailing newline** (seen on 2026-09-01 hour 0; one file, so a single reading). `wc -l` therefore reports one fewer than the record count: 51,581 against 51,582. `count_lines` counts the unterminated last line and matched DuckDB's 51,582 rows, which is why markers record `source_lines` from `count_lines`, never from `wc -l`.
 - **Grouped multi-`count(DISTINCT)` over remote Parquet crashes DuckDB.**
   Worked around by materialising bronze into a local table — which is part of
   why a month needs Spark.
