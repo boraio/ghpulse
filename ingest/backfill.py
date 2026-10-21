@@ -180,6 +180,15 @@ def present_partitions(con, bronze_root: str) -> set:
     return {partition_key(f) for (f,) in rows}
 
 
+def bronze_file(root: str, dt_iso: str, hour: int) -> str:
+    """Bronze Parquet location for one hour under root; same layout as fetch.bronze_path."""
+    return ""
+
+def ingest_one(con, key, *, bronze_root: str, manifest_root: str, user_agent: str, opener=urllib.request.urlopen, sleep=time.sleep, max_attempts: int = 4, min_bytes: int = 100_000, code_version: str = "unknown") -> dict:
+    """Download, decompress and transform one hour, then write its marker after the data; retries per classify(). Returns the marker record. Re-raises on ABORT without writing a marker."""
+    return None
+
+
 def classify(exc: Exception) -> str:
     """Decide what to do about an error from downloading or transforming one hour."""
     if isinstance(exc, urllib.error.HTTPError):
