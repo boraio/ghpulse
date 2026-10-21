@@ -236,7 +236,7 @@ def ingest_one(con, key, *, bronze_root: str, manifest_root: str, user_agent: st
 
 def mode_from_flags(force: bool, retry_absent: bool) -> str:
     """The plan() mode selected by the CLI flags; --force wins over --retry-absent."""
-    return ""
+    return "force" if force else ("retry-absent" if retry_absent else "resume")
 
 def status_counts(keys, statuses, present) -> dict:
     """Counts per marker status over keys, plus unattempted (no marker) and drift (ingested marker but no data)."""
