@@ -219,6 +219,11 @@ def main() -> int:
             self.sql.append(sql)
             return self
 
+    def touch(path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"")
+        return path
+
     def raises(exc_type, fn):
         try:
             fn()
