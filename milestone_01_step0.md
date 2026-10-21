@@ -74,6 +74,10 @@ to the September week, which is six weeks old.
 - aider's temperature setting verified end to end (see `PROJECT.md`, aider
   notes): now `0.0`, confirmed arriving at the server.
 - Draft PR #1 open; CI green with pinned ruff 0.17.1 (its default rules, via `ruff.toml` and `requirements-dev.txt`), `compileall`, and the offline checks now running in CI.
+- `download(url, dest, user_agent, timeout, min_bytes, opener)`: tested offline with a fake opener (bytes and count, User-Agent sent, short read, tiny file) and the real `urlopen` on a `file://` URL. Live on 2026-09-01 hour 0: 6,905,011 bytes, equal to the server's `Content-Length`; gzip intact.
+- `decompress(gz, dest)`: writes the plain file and returns its line count via `count_lines`; a truncated gzip raises one of the retried gzip errors. Live on the same hour: 51,582, equal to the Parquet rows.
+- Manifest: `marker_path`, `write_marker` (local temp JSON, then DuckDB `COPY` to the target), `read_marker` and `read_state` (explicit columns, `hive_partitioning=false`, `glob()` first so a manifest with no markers returns `{}`). Offline checks cover an empty manifest, overwriting a marker, mixed nulls across files, an `s3://` write via a fake connection, and no stray local directory for an `s3://` path. Live on RadosGW under `s3://ghpulse/_scratch/manifest-test`: empty state, overwrite and read-back all as expected.
+- Suite: **60 PASS, 0 FAIL.**
 
 ## Remaining, in order
 
