@@ -186,7 +186,52 @@ def bronze_file(root: str, dt_iso: str, hour: int) -> str:
 
 def ingest_one(con, key, *, bronze_root: str, manifest_root: str, user_agent: str, opener=urllib.request.urlopen, sleep=time.sleep, max_attempts: int = 4, min_bytes: int = 100_000, code_version: str = "unknown") -> dict:
     """Download, decompress and transform one hour, then write its marker after the data; retries per classify(). Returns the marker record. Re-raises on ABORT without writing a marker."""
-    return None
+    dt_iso, hour = key
+    target = bronze_file(bronze_root, dt_iso, hour)
+    record = {
+        "dt": dt_iso,
+        "hour": hour,
+        "status": FAILED,
+        "rows": None,
+        "source_lines": None,
+        "attempts": 0,
+        "error": None,
+        "finished_at": None,
+        "code_version": code_version,
+    }
+    for attempt in range(1, max_attempts + 1):
+        record["attempts"] = attempt
+        try:
+            with tempfile.TemporaryDirectory() as workdir:
+                gz = os.path.join(workdir, "events.json.gz")
+                plain = os.path.join(workdir, "events.json")
+                download(fetch.gharchive_url(dt_iso, hour), gz, user_agent, min_bytes=min_bytes, opener=opener)
+                source_lines = decompress(gz, plain)
+                if not target.startswith("s3://"):
+                    os.makedirs(os.path.dirname(target), exist_ok=True)
+                con.execute(fetch.transform_sql(plain, target, dt_iso, hour))
+            rows = con.execute(f"SELECT count(*) FROM read_parquet('{target}')").fetchone()[0]
+            record.update(status=INGESTED, rows=rows, source_lines=source_lines, error=None)
+            break
+        except Exception as exc:
+            outcome = classify(exc)
+            record["error"] = repr(exc)[:500]
+            if outcome == ABORT:
+                raise
+            if outcome == ABSENT:
+                record["status"] = ABSENT
+                break
+            if outcome == RETRY and attempt < max_attempts:
+                value = getattr(exc, "headers", None) and exc.headers.get("Retry-After")
+                retry_after = float(value) if value and value.isdigit() else None
+                sleep(backoff_s(attempt - 1, retry_after))
+                continue
+            else:
+                record["status"] = FAILED
+                break
+    record["finished_at"] = dt.datetime.now(dt.UTC).isoformat()
+    write_marker(con, marker_path(manifest_root, dt_iso, hour), record)
+    return record
 
 
 def classify(exc: Exception) -> str:
