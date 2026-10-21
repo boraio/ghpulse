@@ -240,7 +240,16 @@ def mode_from_flags(force: bool, retry_absent: bool) -> str:
 
 def status_counts(keys, statuses, present) -> dict:
     """Counts per marker status over keys, plus unattempted (no marker) and drift (ingested marker but no data)."""
-    return {}
+    counts = {"ingested": 0, "absent": 0, "failed": 0, "unattempted": 0, "drift": 0}
+    for key in keys:
+        status = statuses.get(key)
+        if status is None:
+            counts["unattempted"] += 1
+        else:
+            counts[status] = counts.get(status, 0) + 1
+            if status == INGESTED and key not in present:
+                counts["drift"] += 1
+    return counts
 
 def exit_code(records) -> int:
     """1 if any hour failed, else 0."""
