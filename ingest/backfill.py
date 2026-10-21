@@ -262,9 +262,6 @@ def exit_code(records) -> int:
     return 1 if any(r.get("status") == FAILED for r in records) else 0
 
 
-import os
-import subprocess
-
 def code_version() -> str:
     """Short git hash of the checkout, or 'unknown'."""
     try:
