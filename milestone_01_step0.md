@@ -105,9 +105,7 @@ to the September week, which is six weeks old.
   `--retry-absent` redoes.
 - **GH Archive rate limits are unknown.** The default of 4 workers is a starting
   point for the pilot, not a finding.
-- **Blank lines in source files.** `count_lines` counts them as lines. How
-  DuckDB treats them is unknown. If `source_lines` and `rows` disagree on real
-  data, look here first.
+- **Blank lines in source files.** `count_lines` counts them as lines. How DuckDB treats them is unknown. First evidence: 2026-09-01 hour 0 has none, and its file ends without a trailing newline (`count_lines` handles that; `wc -l` undercounts by one). If `source_lines` and `rows` disagree on real data, look here first.
 - **`ignore_errors=true` and silent drops.** `source_lines` is recorded beside
   `rows` as a precaution against malformed lines being dropped without notice.
   Whether it ever happens on this data has not been observed.
