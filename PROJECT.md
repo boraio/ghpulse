@@ -85,7 +85,7 @@ Done and verified offline:
   Each was driven by checks in `tests/test_transform.py`, written first and
   seen to fail before the implementation. The module is tidied (imports at the
   top, a module docstring, `partition_key` raising `ValueError` on a malformed
-  path). The suite is at 45 PASS, 0 FAIL.
+  path).
 
 - Side-effect pieces, each test-first and then checked live: `download` (User-Agent required, injectable opener, `SuspiciousDownload` on a short read or a file under 100,000 bytes, classified as retry), `decompress` (line count via `count_lines`), and the manifest functions `marker_path`, `write_marker`, `read_marker`, `read_state`. Live: the downloaded byte count equalled the server's `Content-Length`; markers were written, overwritten and read back on RadosGW under a scratch prefix. The suite is at 60 PASS, 0 FAIL.
 
