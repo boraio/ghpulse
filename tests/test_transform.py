@@ -224,6 +224,33 @@ def main() -> int:
         path.write_bytes(b"")
         return path
 
+    events_gz = gzip.compress(src.read_bytes())
+    sleeps = []
+
+    def fake_sleep(s):
+        sleeps.append(s)
+
+    def seq_opener(*steps):
+        queue = list(steps)
+        def opener(req, timeout):
+            step = queue.pop(0)
+            if isinstance(step, Exception):
+                raise step
+            else:
+                return FakeResponse(step, len(step))
+        return opener
+
+    def run_one(name, *steps):
+        sleeps.clear()
+        rec = backfill.ingest_one(con, ("2026-09-01", 3), bronze_root=str(tmp / name / "bronze"), manifest_root=str(tmp / name / "manifest"), user_agent="ghpulse-test", opener=seq_opener(*steps), sleep=fake_sleep, min_bytes=10)
+        return (rec, list(sleeps))
+
+    def summary(name, *steps):
+        rec, slept = run_one(name, *steps)
+        rec = rec or {}
+        return (rec.get("status"), rec.get("attempts"), rec.get("rows"), rec.get("source_lines"), len(slept))
+
+    
     def raises(exc_type, fn):
         try:
             fn()
