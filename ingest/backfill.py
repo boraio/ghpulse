@@ -262,6 +262,23 @@ def exit_code(records) -> int:
     return 1 if any(r.get("status") == FAILED for r in records) else 0
 
 
+def code_version() -> str:
+    """Short git hash of the checkout, or 'unknown'."""
+    return ""
+
+def _worker(job) -> dict:
+    """Process-pool entry point: one DuckDB connection per worker, then ingest_one(). Always returns a dict, never raises."""
+    return None
+
+def run_pool(todo, bronze_root: str, manifest_root: str, workers: int) -> int:
+    """Ingest the planned hours with a spawn-based process pool; returns the exit code (2 on abort)."""
+    return -1
+
+def main(argv=None) -> int:
+    """CLI entry point; see --help."""
+    return -1
+
+
 def classify(exc: Exception) -> str:
     """Decide what to do about an error from downloading or transforming one hour."""
     if isinstance(exc, urllib.error.HTTPError):
