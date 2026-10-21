@@ -238,6 +238,8 @@ wrong in milestone 1 step 0.
 - **Do not run `/test` while a check is red.** It feeds the failure to the
   model, which patches the failing line, and it twice fixed the wrong thing.
   Run the suite in the other pane.
+- **Read every implementation, even when green.** `write_marker` once passed every check while doing nothing for `s3://` paths (the model nested the whole body under a local-path `if`). Local tests could not reach that case, so a fake connection that records its SQL now covers it.
+- **Indentation changes are block edits in disguise.** Asked to dedent a block, the model deleted the `if` line instead. Phrase such changes as a single-line replacement that spells out every resulting line.
 - `/diff` goes through `less` and hides its output; use
   `git --no-pager diff`.
 - aider commits every edit, so the branch fills with small commits. Merge with GitHub's "Squash and merge" (enabled on the repo), so `main` gets one commit and the pushed branch is never rewritten.
