@@ -106,9 +106,8 @@ to the September week, which is six weeks old.
 - **GH Archive rate limits are unknown.** The default of 4 workers is a starting
   point for the pilot, not a finding.
 - **Blank lines in source files.** `count_lines` counts them as lines. How DuckDB treats them is unknown. First evidence: 2026-09-01 hour 0 has none, and its file ends without a trailing newline (`count_lines` handles that; `wc -l` undercounts by one). If `source_lines` and `rows` disagree on real data, look here first.
-- **`ignore_errors=true` and silent drops.** `source_lines` is recorded beside
-  `rows` as a precaution against malformed lines being dropped without notice.
-  Whether it ever happens on this data has not been observed.
+- **`ignore_errors=true` and silent drops.** `source_lines` is recorded beside `rows` as a precaution against malformed lines being dropped without notice. First evidence: for 2026-09-01 hour 0, `count_lines` gives 51,582, equal to the rows written, so nothing was dropped there. One hour is a single reading; the full week's markers will show whether it holds.
+- **Scratch objects.** Two test markers remain under `s3://ghpulse/_scratch/manifest-test/` (96 and 60 bytes). A dry-run delete listed exactly those two; remove them with the same `aws s3 rm` without `--dryrun`, or leave them.
 - **`duckdb.IOException` classification.** Planned as a retry, but it is not
   known whether DuckDB raises it only for S3 problems or also for local read
   errors. Needs a run against a real failure; until then only download-side
