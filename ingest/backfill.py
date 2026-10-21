@@ -306,11 +306,6 @@ def run_pool(todo, bronze_root: str, manifest_root: str, workers: int) -> int:
     print(f"done: {len(records)} hours, {absent} absent, {sum(1 for r in records if r['status'] == FAILED)} failed")
     return exit_code(records)
 
-import argparse
-import datetime as dt
-import os
-import sys
-
 def main(argv=None) -> int:
     """CLI entry point; see --help."""
     parser = argparse.ArgumentParser(description="Resumable GH Archive backfill into bronze, with a manifest per hour.")
