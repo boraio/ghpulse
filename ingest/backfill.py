@@ -173,7 +173,8 @@ def read_state(con, root: str) -> dict:
 
 def present_partitions(con, bronze_root: str) -> set:
     """The (dt, hour) keys of every data.parquet under bronze_root; empty when there are none."""
-    return None
+    rows = con.execute(f"SELECT file FROM glob('{bronze_root}/*/*/data.parquet')").fetchall()
+    return {partition_key(f) for (f,) in rows}
 
 
 def classify(exc: Exception) -> str:
