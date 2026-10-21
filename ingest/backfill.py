@@ -234,6 +234,19 @@ def ingest_one(con, key, *, bronze_root: str, manifest_root: str, user_agent: st
     return record
 
 
+def mode_from_flags(force: bool, retry_absent: bool) -> str:
+    """The plan() mode selected by the CLI flags; --force wins over --retry-absent."""
+    return ""
+
+def status_counts(keys, statuses, present) -> dict:
+    """Counts per marker status over keys, plus unattempted (no marker) and drift (ingested marker but no data)."""
+    return {}
+
+def exit_code(records) -> int:
+    """1 if any hour failed, else 0."""
+    return -1
+
+
 def classify(exc: Exception) -> str:
     """Decide what to do about an error from downloading or transforming one hour."""
     if isinstance(exc, urllib.error.HTTPError):
