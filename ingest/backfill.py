@@ -309,9 +309,58 @@ def run_pool(todo, bronze_root: str, manifest_root: str, workers: int) -> int:
     print(f"done: {len(records)} hours, {absent} absent, {sum(1 for r in records if r['status'] == FAILED)} failed")
     return exit_code(records)
 
+import argparse
+import datetime as dt
+import os
+import sys
+
 def main(argv=None) -> int:
     """CLI entry point; see --help."""
-    return -1
+    parser = argparse.ArgumentParser(description="Resumable GH Archive backfill into bronze, with a manifest per hour.")
+    parser.add_argument("--start", required=True, help="first hour, YYYY-MM-DDTHH, UTC")
+    parser.add_argument("--end", required=True, help="last hour, inclusive")
+    parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--retry-absent", action="store_true")
+    parser.add_argument("--force", action="store_true")
+    parser.add_argument("--yes", action="store_true")
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--status", action="store_true")
+    parser.add_argument("--bronze-root", default=f"s3://{fetch.BUCKET}/bronze/events")
+    parser.add_argument("--manifest-root", default=f"s3://{fetch.BUCKET}/_manifest/events")
+    args = parser.parse_args(argv)
+
+    if args.force and not args.yes:
+        sys.exit("--force overwrites existing partitions; add --yes to confirm")
+
+    keys = hour_range(parse_hour(args.start), parse_hour(args.end))
+    now = dt.datetime.now(dt.UTC)
+    recent = [k for k in keys if too_recent(k, now)]
+    keys = [k for k in keys if not too_recent(k, now)]
+
+    if recent:
+        print(f"skipping {len(recent)} hours inside the publish lag", file=sys.stderr)
+
+    con = duckdb.connect()
+    if args.bronze_root.startswith("s3://") or args.manifest_root.startswith("s3://"):
+        fetch.s3_config(con)
+
+    statuses = read_state(con, args.manifest_root)
+    present = present_partitions(con, args.bronze_root)
+
+    if args.status:
+        for name, n in status_counts(keys, statuses, present).items():
+            print(f"{name:12} {n}")
+        return 0
+
+    todo = plan(keys, statuses, present, mode_from_flags(args.force, args.retry_absent))
+    print(f"{len(todo)} of {len(keys)} hours to process")
+
+    if args.dry_run:
+        for k in todo:
+            print(f"  {k[0]} {k[1]:02d}")
+        return 0
+
+    return run_pool(todo, args.bronze_root, args.manifest_root, args.workers)
 
 
 def classify(exc: Exception) -> str:
