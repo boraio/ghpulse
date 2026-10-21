@@ -262,9 +262,16 @@ def exit_code(records) -> int:
     return 1 if any(r.get("status") == FAILED for r in records) else 0
 
 
+import os
+import subprocess
+
 def code_version() -> str:
     """Short git hash of the checkout, or 'unknown'."""
-    return ""
+    try:
+        out = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+        return out.stdout.strip() or "unknown"
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
 
 def _worker(job) -> dict:
     """Process-pool entry point: one DuckDB connection per worker, then ingest_one(). Always returns a dict, never raises."""
