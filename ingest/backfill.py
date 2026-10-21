@@ -182,7 +182,7 @@ def present_partitions(con, bronze_root: str) -> set:
 
 def bronze_file(root: str, dt_iso: str, hour: int) -> str:
     """Bronze Parquet location for one hour under root; same layout as fetch.bronze_path."""
-    return ""
+    return fetch.bronze_path(root, dt_iso, hour)
 
 def ingest_one(con, key, *, bronze_root: str, manifest_root: str, user_agent: str, opener=urllib.request.urlopen, sleep=time.sleep, max_attempts: int = 4, min_bytes: int = 100_000, code_version: str = "unknown") -> dict:
     """Download, decompress and transform one hour, then write its marker after the data; retries per classify(). Returns the marker record. Re-raises on ABORT without writing a marker."""

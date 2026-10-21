@@ -16,6 +16,7 @@ import tempfile
 from pathlib import Path
 
 import duckdb
+import fetch
 
 # One row per event type we care about, deliberately ragged: PushEvent has
 # no `action`, WatchEvent has no `pull_request`, and the last row carries a
