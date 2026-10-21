@@ -294,3 +294,7 @@ def classify(exc: Exception) -> str:
     elif isinstance(exc, (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException, EOFError, gzip.BadGzipFile, zlib.error, SuspiciousDownload)):
         return RETRY
     return FAIL
+
+
+if __name__ == "__main__":
+    sys.exit(main())
