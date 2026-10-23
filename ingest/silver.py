@@ -27,6 +27,14 @@ _SPEC = {
                 "json_extract_string(payload, '$.review.state') AS state")),
 }
 
+# Stability rule from milestone_01_measurements.md: median non-push events per hour in Sep 22-28.
+REF_NONPUSH = 16893
+
+
+def is_stable(n: int, push: int) -> bool:
+    """True when an hour looks like normal capture: pushes present, push share 0.50-0.95 and non-push events within 3x of REF_NONPUSH, bounds inclusive."""
+    return None  # stub
+
 
 def silver_sql(table: str) -> str:
     """Return the SELECT that builds one silver table from a relation named `bronze`."""
