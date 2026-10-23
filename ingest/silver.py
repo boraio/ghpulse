@@ -30,4 +30,13 @@ _SPEC = {
 
 def silver_sql(table: str) -> str:
     """Return the SELECT that builds one silver table from a relation named `bronze` (stub)."""
-    return "SELECT 1 AS id"
+    if table not in _SPEC:
+        raise ValueError(f"unknown silver table: {table!r}")
+    event_type, extra = _SPEC[table]
+    cols = _COMMON + (", " + extra if extra else "")
+    # Dedup on id within one bronze hour: every measured duplicate was within a single hour.
+    return (
+        f"SELECT {cols} FROM bronze "
+        f"WHERE type = '{event_type}' AND actor.login NOT LIKE '%[bot]' "
+        "QUALIFY row_number() OVER (PARTITION BY id ORDER BY created_at) = 1"
+    )
