@@ -1,9 +1,27 @@
 # Milestone 1, step 0 — backfill mechanics: decisions, progress, open items
 
-Status as of 2026-10-19 (evening): **in progress.** Branch `backfill-mechanics`,
-local and unpushed. No backfill has been run. This page is the working log for
+Status as of 2026-10-23: **functionally complete.** Branch `backfill-mechanics`,
+pushed as draft PR #1, CI green, 78 offline checks. The tool has backfilled two
+weeks (see `milestone_01_measurements.md`). Remaining: a deliberate
+interrupt-and-resume test, and turning off DuckDB's progress bars in workers. This page is the working log for
 step 0 of `milestone_01.md`; fold what matters into the README and retire it
 when step 0 merges.
+
+**Update, 2026-10-23: step 0 is complete; only the merge of PR #1 remains.**
+Interrupt-and-resume test on 2026-09-15…21 (168 hours, 4 workers): stopped with
+Ctrl-C after 51 hours had markers. `--status` then showed 51 ingested, 117
+unattempted, 0 failed, 0 drift, and `--dry-run` planned exactly 117. The resumed
+run ingested those 117 and no others, ending at 168 ingested, 0 failed, 0 drift.
+Worker progress bars are off (`SET enable_progress_bar=false`, checked live).
+Bronze now covers 2026-09-01…28 contiguously, 672 hours. Known issue, not
+fixed: Ctrl-C does not stop a run cleanly. It took four presses and printed
+tracebacks, and hours 13 and 14 of 2026-09-17 were ingested after the first
+press although the log had stopped at hour 03, which fits
+`ProcessPoolExecutor.shutdown(wait=True)` draining queued work. Follow-up:
+catch `KeyboardInterrupt` in `run_pool`, cancel queued futures, exit 130. After
+an interrupt the run log can miss hours (stdout is block-buffered into `tee`;
+use `python -u`), so the manifest is the record. `pgrep -af backfill.py` does
+not match spawn workers; use `pgrep -af 'multiprocessing|backfill'`.
 
 ## Agreed design
 
@@ -73,26 +91,38 @@ to the September week, which is six weeks old.
   and the file was restored from the known-good commit.
 - aider's temperature setting verified end to end (see `PROJECT.md`, aider
   notes): now `0.0`, confirmed arriving at the server.
-- Draft PR #1 open; CI green with pinned ruff 0.17.1 (its default rules, via `ruff.toml` and `requirements-dev.txt`), `compileall`, and the offline checks now running in CI.
-- `download(url, dest, user_agent, timeout, min_bytes, opener)`: tested offline with a fake opener (bytes and count, User-Agent sent, short read, tiny file) and the real `urlopen` on a `file://` URL. Live on 2026-09-01 hour 0: 6,905,011 bytes, equal to the server's `Content-Length`; gzip intact.
-- `decompress(gz, dest)`: writes the plain file and returns its line count via `count_lines`; a truncated gzip raises one of the retried gzip errors. Live on the same hour: 51,582, equal to the Parquet rows.
-- Manifest: `marker_path`, `write_marker` (local temp JSON, then DuckDB `COPY` to the target), `read_marker` and `read_state` (explicit columns, `hive_partitioning=false`, `glob()` first so a manifest with no markers returns `{}`). Offline checks cover an empty manifest, overwriting a marker, mixed nulls across files, an `s3://` write via a fake connection, and no stray local directory for an `s3://` path. Live on RadosGW under `s3://ghpulse/_scratch/manifest-test`: empty state, overwrite and read-back all as expected.
+- Draft PR #1 open; CI green with pinned ruff 0.17.1 (its default rules, via
+  `ruff.toml` and `requirements-dev.txt`), `compileall`, and the offline checks
+  now running in CI.
+- `download(url, dest, user_agent, timeout, min_bytes, opener)`: tested offline
+  with a fake opener (bytes and count, User-Agent sent, short read, tiny file)
+  and the real `urlopen` on a `file://` URL. Live on 2026-09-01 hour 0: 6,905,011
+  bytes, equal to the server's `Content-Length`; gzip intact.
+- `decompress(gz, dest)`: writes the plain file and returns its line count via
+  `count_lines`; a truncated gzip raises one of the retried gzip errors. Live on
+  the same hour: 51,582, equal to the Parquet rows.
+- Manifest: `marker_path`, `write_marker` (local temp JSON, then DuckDB `COPY`
+  to the target), `read_marker` and `read_state` (explicit columns,
+  `hive_partitioning=false`, `glob()` first so a manifest with no markers
+  returns `{}`). Offline checks cover an empty manifest, overwriting a marker,
+  mixed nulls across files, an `s3://` write via a fake connection, and no
+  stray local directory for an `s3://` path. Live on RadosGW under
+  `s3://ghpulse/_scratch/manifest-test`: empty state, overwrite and read-back
+  all as expected.
 - Suite: **60 PASS, 0 FAIL.**
 
 ## Remaining, in order
 
-1. **Remaining side-effect pieces**, each test-first: list which bronze partitions exist (the `present` set for `plan()`, via `glob()` and `partition_key`), and the per-hour worker `ingest_one`: download into a temporary directory (so a partial file from a `SuspiciousDownload` is discarded), decompress, transform, then write the marker after the data, with a retry loop using `backoff_s` and `classify`, and `finished_at` and a `code_version` stamp in the marker.
-2. **CLI**: `--start`, `--end`, `--workers`, `--retry-absent`, `--force --yes`,
-   `--dry-run`, `--status`.
-3. **Pilot and run.** 6 hours at 1 worker then 4 and compare throughput. Then
-   `--status` and `--dry-run` for the full week. Then
-   `2026-09-01T00` to `2026-09-07T23`. Hour 0 of 2026-09-01 already exists
-   without a marker and will be redone harmlessly.
-4. **Measurements** (steps 1 and 2 of `milestone_01.md`): duplicate `id` rate
-   within an hour, a day and the week (read only the `id` column, to avoid the
-   grouped `count(DISTINCT)` crash); bot share of events and of distinct actors
-   by the `[bot]` suffix; Parquet bytes per hour and per day. Use
-   `hive_partitioning=false` on every bronze read.
+Done since the last update: `present_partitions`, `ingest_one`, the CLI, the
+pilot (4 hours at 1 worker, 8 at 4 workers; about 2.3× by rows) and both weekly
+backfills. What is left:
+
+1. **Interrupt-and-resume test.** Start a backfill over a fresh range, stop it
+   with Ctrl-C partway, re-run it, and confirm that `--status` ends with every
+   hour accounted for and nothing re-downloaded that had a marker.
+2. **Progress bars.** Add `SET enable_progress_bar=false` in `_worker`; the
+   bars clutter the run log.
+3. **Merge PR #1** with "Squash and merge" once those two are done.
 
 ## Open items and unknowns
 
@@ -109,9 +139,20 @@ to the September week, which is six weeks old.
   `--retry-absent` redoes.
 - **GH Archive rate limits are unknown.** The default of 4 workers is a starting
   point for the pilot, not a finding.
-- **Blank lines in source files.** `count_lines` counts them as lines. How DuckDB treats them is unknown. First evidence: 2026-09-01 hour 0 has none, and its file ends without a trailing newline (`count_lines` handles that; `wc -l` undercounts by one). If `source_lines` and `rows` disagree on real data, look here first.
-- **`ignore_errors=true` and silent drops.** `source_lines` is recorded beside `rows` as a precaution against malformed lines being dropped without notice. First evidence: for 2026-09-01 hour 0, `count_lines` gives 51,582, equal to the rows written, so nothing was dropped there. One hour is a single reading; the full week's markers will show whether it holds.
-- **Scratch objects.** Two test markers remain under `s3://ghpulse/_scratch/manifest-test/` (96 and 60 bytes). A dry-run delete listed exactly those two; remove them with the same `aws s3 rm` without `--dryrun`, or leave them.
+- **Blank lines in source files.** `count_lines` counts them as lines. How
+  DuckDB treats them is unknown. First evidence: 2026-09-01 hour 0 has none, and
+  its file ends without a trailing newline (`count_lines` handles that; `wc -l`
+  undercounts by one). If `source_lines` and `rows` disagree on real data, look
+  here first.
+- **`ignore_errors=true` and silent drops.** `source_lines` is recorded beside
+  `rows` as a precaution against malformed lines being dropped without notice.
+  First evidence: for 2026-09-01 hour 0, `count_lines` gives 51,582, equal to
+  the rows written, so nothing was dropped there. One hour is a single reading;
+  the full week's markers will show whether it holds.
+- **Scratch objects.** Two test markers remain under
+  `s3://ghpulse/_scratch/manifest-test/` (96 and 60 bytes). A dry-run delete
+  listed exactly those two; remove them with the same `aws s3 rm` without
+  `--dryrun`, or leave them.
 - **`duckdb.IOException` classification.** Planned as a retry, but it is not
   known whether DuckDB raises it only for S3 problems or also for local read
   errors. Needs a run against a real failure; until then only download-side
@@ -122,8 +163,12 @@ to the September week, which is six weeks old.
   51,582 events and about 5.9 MB of Parquet; a single fetch took about 3.6 s
   wall with a peak of about 370 MB resident, on a 32-core, 440 GB host. The
   step 2 measurement supersedes the size figure.
-- **Branch history** is many small aider commits, one commit with a syntax error that the next commit fixed, and a restore commit. Resolved without a rewrite: the branch is pushed as-is and will merge with "Squash and merge".
-- **Repo copies of the docs** were synced on 2026-10-19 (`PROJECT.md` and this page; the repo had matched the original project copy). Keep both in step when either changes.
+- **Branch history** is many small aider commits, one commit with a syntax error
+  that the next commit fixed, and a restore commit. Resolved without a rewrite:
+  the branch is pushed as-is and will merge with "Squash and merge".
+- **Repo copies of the docs** were synced on 2026-10-19 (`PROJECT.md` and
+  this page; the repo had matched the original project copy). Keep both in step
+  when either changes.
 
 ## Step 0 is done when
 

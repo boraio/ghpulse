@@ -69,9 +69,9 @@ project demonstrates.
 transform, land on Ceph, query from DuckDB. 100,774 events, 17,948 actors,
 22,661 repos, 16 event types. Nine offline checks green. CI passing.
 
-**Milestone 1, step 0 (backfill mechanics) is in progress**, last updated
-2026-10-19, on the local, unpushed branch `backfill-mechanics`. Nothing has
-been merged and no backfill has been run yet.
+**Milestone 1, step 0 (backfill mechanics) is complete**, last updated
+2026-10-23, on branch `backfill-mechanics` (draft PR #1, to be squash-merged).
+Bronze covers 2026-09-01…28 contiguously, 672 hours.
 
 Done and verified offline:
 
@@ -86,13 +86,33 @@ Done and verified offline:
   seen to fail before the implementation. The module is tidied (imports at the
   top, a module docstring, `partition_key` raising `ValueError` on a malformed
   path).
+- Side-effect pieces, each test-first and then checked live: `download`
+  (User-Agent required, injectable opener, `SuspiciousDownload` on a short read
+  or a file under 100,000 bytes, classified as retry), `decompress` (line count
+  via `count_lines`), and the manifest functions `marker_path`, `write_marker`,
+  `read_marker`, `read_state`. Live: the downloaded byte count equalled the
+  server's `Content-Length`; markers were written, overwritten and read back on
+  RadosGW under a scratch prefix.
+- `present_partitions`, the per-hour worker `ingest_one` (retries per
+  `classify`, marker written after the data, no marker on ABORT) and the CLI
+  (`--status`, `--dry-run`, `--retry-absent`, `--force --yes`, a spawn-based
+  process pool). The suite is at 78 PASS, 0 FAIL. The interrupt-and-resume
+  test passed on 2026-09-15…21 (details in the step 0 page).
+- **Step 1 done:** 2026-09-01…07 and 2026-09-22…28 ingested, 168/168 hours each,
+  with `rows = source_lines` on all 336 markers. Sep 1–7 turned out to contain
+  upstream capture regime shifts (95 hours with no PushEvents at all), so the
+  measurement week moved to Sep 22–28.
+- **Step 2 measured on Sep 22–28:** 5 duplicate ids in 14.9M rows, all within
+  single hours; `[bot]`-suffixed actors produce 18.0% of events and are 0.47% of
+  actors; Parquet averages 14.6 MB per hour, about 10.5 GB per month. Details,
+  the regime analysis and a proposed per-hour stability rule are in
+  **`milestone_01_measurements.md`**.
+- Pushed as draft PR #1 (`backfill-mechanics` → `main`). CI is green: ruff
+  lint with the pinned version, `compileall`, and the offline checks, so the
+  checks are verified on a clean runner, not only locally.
 
-- Side-effect pieces, each test-first and then checked live: `download` (User-Agent required, injectable opener, `SuspiciousDownload` on a short read or a file under 100,000 bytes, classified as retry), `decompress` (line count via `count_lines`), and the manifest functions `marker_path`, `write_marker`, `read_marker`, `read_state`. Live: the downloaded byte count equalled the server's `Content-Length`; markers were written, overwritten and read back on RadosGW under a scratch prefix. The suite is at 60 PASS, 0 FAIL.
-
-- Pushed as draft PR #1 (`backfill-mechanics` → `main`). CI is green: ruff lint with the pinned version, `compileall`, and the offline checks, so the checks are verified on a clean runner, not only locally.
-
-Not yet written: listing which bronze partitions exist, the per-hour worker,
-the CLI, and the first real run. Decisions, remaining work and open unknowns
+Next: decide the stability rule and the dedup window, then silver transforms
+in Spark (step 3). Decisions, remaining work and open unknowns
 are in **`milestone_01_step0.md`**.
 
 ## Milestones
@@ -169,7 +189,11 @@ Each of these cost real time. Do not relitigate them without evidence.
   like missing data. Our own bronze paths do zero-pad the hour (`hour=05`).
 - **GH Archive 403s `urllib` without a `User-Agent` header**, while returning
   200 to curl for the same URL.
-- **GH Archive hourly files end without a trailing newline** (seen on 2026-09-01 hour 0; one file, so a single reading). `wc -l` therefore reports one fewer than the record count: 51,581 against 51,582. `count_lines` counts the unterminated last line and matched DuckDB's 51,582 rows, which is why markers record `source_lines` from `count_lines`, never from `wc -l`.
+- **GH Archive hourly files end without a trailing newline** (seen on
+  2026-09-01 hour 0; one file, so a single reading). `wc -l` therefore reports
+  one fewer than the record count: 51,581 against 51,582. `count_lines` counts
+  the unterminated last line and matched DuckDB's 51,582 rows, which is why
+  markers record `source_lines` from `count_lines`, never from `wc -l`.
 - **Grouped multi-`count(DISTINCT)` over remote Parquet crashes DuckDB.**
   Worked around by materialising bronze into a local table — which is part of
   why a month needs Spark.
@@ -206,8 +230,13 @@ Each of these cost real time. Do not relitigate them without evidence.
   resolves the system binaries and reports misleading failures. This includes
   the pane used for acceptance checks: without the venv, `python` is missing
   and the FAIL/PASS counts both print 0 (a PASS count of 0 is the tell).
-- Dependencies in `requirements.txt`; dev tools in `requirements-dev.txt` (which pulls in `requirements.txt` and pins `ruff==0.17.1`; CI installs it).
-- Lint: `ruff.toml` sets only `target-version = "py312"`, so the rule set is the pinned ruff version's default (407 rules at 0.17.1). Changing the pin is the only thing that changes the rules; review the lint output when bumping it. The `# noqa: SIM114` lines in `plan()` are deliberate: the merge ruff suggests is the `A or B and C` shape that once hid a bug there.
+- Dependencies in `requirements.txt`; dev tools in `requirements-dev.txt`
+  (which pulls in `requirements.txt` and pins `ruff==0.17.1`; CI installs it).
+- Lint: `ruff.toml` sets only `target-version = "py312"`, so the rule set is the
+  pinned ruff version's default (407 rules at 0.17.1). Changing the pin is the
+  only thing that changes the rules; review the lint output when bumping it.
+  The `# noqa: SIM114` lines in `plan()` are deliberate: the merge ruff
+  suggests is the `A or B and C` shape that once hid a bug there.
 - Comments explain **why**, not what the next line does. Never state a claim
   about a tool's behaviour that hasn't been verified.
 - Secrets live in `/etc/jenga.env`, loaded via shell helpers. `.gitignore`
@@ -218,7 +247,9 @@ Each of these cost real time. Do not relitigate them without evidence.
 Code is written by aider with the local model; these rules come from what went
 wrong in milestone 1 step 0.
 
-- **aider first, always.** Every change to code, config or docs is attempted through aider first. An assert-guarded script or `sed` is the fallback only after aider has failed to apply an edit, and is said so in the commit.
+- **aider first, always.** Every change to code, config or docs is attempted
+  through aider first. An assert-guarded script or `sed` is the fallback only
+  after aider has failed to apply an edit, and is said so in the commit.
 - **One change per prompt, one anchor per edit.** An edit that touches two
   places (an import at the top and code far below) is split into two prompts.
   Multi-part prompts overran the 4096-token output cap and produced bad commits.
@@ -235,14 +266,28 @@ wrong in milestone 1 step 0.
   evidence: the model once passed it by deleting the tests.
 - **Test first, against a stub that returns wrong values** (not one that
   raises), so the checks fail cleanly for the right reason.
+- **Read every implementation, even when green.** `write_marker` once passed
+  every check while doing nothing for `s3://` paths (the model nested the whole
+  body under a local-path `if`). Local tests could not reach that case, so a
+  fake connection that records its SQL now covers it.
+- **Indentation changes are block edits in disguise.** Asked to dedent a block,
+  the model deleted the `if` line instead. Phrase such changes as a
+  single-line replacement that spells out every resulting line.
+- **Quote every existing line of a block being replaced.** Identifying a block
+  by its first and last words made the model reconstruct the middle from
+  memory and fail to match.
+- **Decline aider's offers to fix lint or test failures.** The auto-fix once
+  added an import in the wrong place, rewrote a stub with the wrong
+  signature, and implemented a function ahead of its red test; undoing it took
+  two reverts.
 - **Do not run `/test` while a check is red.** It feeds the failure to the
   model, which patches the failing line, and it twice fixed the wrong thing.
   Run the suite in the other pane.
-- **Read every implementation, even when green.** `write_marker` once passed every check while doing nothing for `s3://` paths (the model nested the whole body under a local-path `if`). Local tests could not reach that case, so a fake connection that records its SQL now covers it.
-- **Indentation changes are block edits in disguise.** Asked to dedent a block, the model deleted the `if` line instead. Phrase such changes as a single-line replacement that spells out every resulting line.
 - `/diff` goes through `less` and hides its output; use
   `git --no-pager diff`.
-- aider commits every edit, so the branch fills with small commits. Merge with GitHub's "Squash and merge" (enabled on the repo), so `main` gets one commit and the pushed branch is never rewritten.
+- aider commits every edit, so the branch fills with small commits. Merge with
+  GitHub's "Squash and merge" (enabled on the repo), so `main` gets one commit
+  and the pushed branch is never rewritten.
 - Observed limits: context of 16384 tokens per slot and a 4096-token output
   cap.
 - **Temperature is set explicitly to `0.0`** in `.aider.model.settings.yml`

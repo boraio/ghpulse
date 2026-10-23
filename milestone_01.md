@@ -153,3 +153,26 @@ dense enough that ALS produces something that beats most-popular on Recall@10.
 If it does not beat most-popular, that is a finding worth reporting rather than
 hiding. A negative result with an honest evaluation protocol is worth more than
 a positive one with a leaky split.
+
+---
+
+## Progress and decisions (2026-10-23)
+
+- **Step 0 done**, including the interrupt-and-resume test (2026-09-15…21):
+  `ingest/backfill.py` has a per-hour manifest, resume, `--force --yes`,
+  `--retry-absent`, `--status`, `--dry-run` and a process pool; 78 offline
+  checks, CI green. Details in `milestone_01_step0.md`.
+- **Step 1 done, with a change of week.** Both 2026-09-01…07 and 2026-09-22…28
+  are ingested (168/168 hours each). The measurement week is **Sep 22–28**:
+  Sep 1–7 contains upstream capture regime shifts (95 hours with no
+  PushEvents at all), so it stays ingested as the documented example of that,
+  not as the basis for measurements.
+- **Step 2 measured on Sep 22–28** (see `milestone_01_measurements.md`):
+  - duplicate ids: 5 in 14.9M rows, all within single hours, so dedup per hour
+    is supported, with a cross-hour check kept as a data-quality gate;
+  - `[bot]` suffix: 18.0% of events, 0.47% of actors (lower bounds);
+  - Parquet: 14.6 MB per hour on average, about 10.5 GB per month.
+- **New decision to make before step 5:** a per-hour stability rule, so the
+  month is chosen from hours where both pushes and non-push events are present
+  in normal proportions. A proposed rule and its numbers are in the
+  measurements page.
