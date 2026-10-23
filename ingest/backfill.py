@@ -275,6 +275,7 @@ def _worker(job) -> dict:
     key, bronze_root, manifest_root, threads, version = job
     con = duckdb.connect()
     con.execute(f"SET threads={threads}")
+    con.execute("SET enable_progress_bar=false")
     if bronze_root.startswith("s3://") or manifest_root.startswith("s3://"):
         fetch.s3_config(con)
     try:
