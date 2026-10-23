@@ -33,6 +33,16 @@ GHARCHIVE = "https://data.gharchive.org/{date}-{hour}.json.gz"
 USER_AGENT = "ghpulse/0.1 (+https://github.com/boraio/ghpulse)"
 BUCKET = os.environ.get("GHPULSE_BUCKET", "ghpulse")
 
+# Normalise the date: GH Archive paths are zero-padded for the month but
+# NOT for the hour (2026-09-01-5.json.gz, not -05). Getting either wrong
+# yields a 404 that looks like missing data.
+def gharchive_url(date: str, hour: int) -> str:
+    return GHARCHIVE.format(date=date, hour=hour)
+
+
+def bronze_path(date: str, hour: int) -> str:
+    return f"s3://{BUCKET}/bronze/events/dt={date}/hour={hour:02d}/data.parquet"
+
 
 def s3_config(con: duckdb.DuckDBPyConnection) -> None:
     """Point DuckDB at RadosGW.
@@ -57,10 +67,42 @@ def s3_config(con: duckdb.DuckDBPyConnection) -> None:
         con.execute(f"SET {setting}='{val}'")
 
 
+def transform_sql(src, target, date, hour) -> str:
+    # union_by_name: event payloads differ by type, and the schema drifts
+    # as GitHub adds fields. Without it, a file whose first rows lack a
+    # column fails on a later row that has it.
+    #
+    # Do NOT add maximum_depth here. Limiting it stops actor and repo
+    # being parsed as structs too, so actor.login returns a quoted JSON
+    # value ('"dave[bot]"') rather than a plain string — and every
+    # string comparison against it silently stops matching.
+    return f"""
+        COPY (
+            SELECT
+                id, type, actor, repo,
+                -- payload as JSON TEXT, not a struct.
+                -- read_json_auto merges every event type's payload into
+                -- one giant struct — PushEvent's `commits` alongside
+                -- IssuesEvent's `issue` alongside PullRequestEvent's
+                -- `pull_request`, ~200 fields, nearly all NULL per row.
+                -- Beyond being wasteful, DuckDB crashes with
+                -- "INTERNAL Error: Unsupported type for
+                -- NumericValueUnionToValue" when querying it.
+                -- JSON preserves everything and commits to nothing;
+                -- silver extracts typed columns per event type.
+                CAST(payload AS JSON) AS payload,
+                public,
+                CAST(created_at AS TIMESTAMP) AS created_at,
+                '{date}' AS dt,
+                {hour} AS hour
+            FROM read_json_auto('{src}', union_by_name=true, ignore_errors=true)
+        ) TO '{target}' (FORMAT PARQUET, COMPRESSION ZSTD, OVERWRITE_OR_IGNORE 1)
+    """
+
 def fetch_hour(con: duckdb.DuckDBPyConnection, date: str, hour: int, dry_run: bool) -> int:
     """Download one hour, write it to bronze, return the row count."""
-    url = GHARCHIVE.format(date=date, hour=hour)
-    target = f"s3://{BUCKET}/bronze/events/dt={date}/hour={hour:02d}/data.parquet"
+    url = gharchive_url(date, hour)
+    target = bronze_path(date, hour)
 
     print(f"  {url}")
     if dry_run:
@@ -97,36 +139,7 @@ def fetch_hour(con: duckdb.DuckDBPyConnection, date: str, hour: int, dry_run: bo
             while chunk := fin.read(1 << 20):
                 fout.write(chunk)
 
-        # union_by_name: event payloads differ by type, and the schema drifts
-        # as GitHub adds fields. Without it, a file whose first rows lack a
-        # column fails on a later row that has it.
-        #
-        # Do NOT add maximum_depth here. Limiting it stops actor and repo
-        # being parsed as structs too, so actor.login returns a quoted JSON
-        # value ('"dave[bot]"') rather than a plain string — and every
-        # string comparison against it silently stops matching.
-        con.execute(f"""
-            COPY (
-                SELECT
-                    id, type, actor, repo,
-                    -- payload as JSON TEXT, not a struct.
-                    -- read_json_auto merges every event type's payload into
-                    -- one giant struct — PushEvent's `commits` alongside
-                    -- IssuesEvent's `issue` alongside PullRequestEvent's
-                    -- `pull_request`, ~200 fields, nearly all NULL per row.
-                    -- Beyond being wasteful, DuckDB crashes with
-                    -- "INTERNAL Error: Unsupported type for
-                    -- NumericValueUnionToValue" when querying it.
-                    -- JSON preserves everything and commits to nothing;
-                    -- silver extracts typed columns per event type.
-                    CAST(payload AS JSON) AS payload,
-                    public,
-                    CAST(created_at AS TIMESTAMP) AS created_at,
-                    '{date}' AS dt,
-                    {hour} AS hour
-                FROM read_json_auto('{plain}', union_by_name=true, ignore_errors=true)
-            ) TO '{target}' (FORMAT PARQUET, COMPRESSION ZSTD, OVERWRITE_OR_IGNORE 1)
-        """)
+        con.execute(transform_sql(plain, target, date, hour))
 
         rows = con.execute(
             f"SELECT count(*) FROM read_parquet('{target}')"
