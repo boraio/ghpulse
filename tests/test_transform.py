@@ -110,6 +110,7 @@ def main() -> int:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ingest"))
     import backfill
     import fetch
+    import silver
 
     results += [
         check("hour_range from parse_hour('2026-09-01T23') to parse_hour('2026-09-02T01') equals [('2026-09-01', 23), ('2026-09-02', 0), ('2026-09-02', 1)]",
