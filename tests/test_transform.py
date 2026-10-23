@@ -341,6 +341,16 @@ def main() -> int:
         check("hour_range with end before start raises ValueError (checked without the placeholder)", raises(ValueError, lambda: backfill.hour_range(backfill.parse_hour('2026-09-02T01'), backfill.parse_hour('2026-09-01T23'))), True),
         check("incomplete reads retry", C(http.client.IncompleteRead(b"")), backfill.RETRY),
         check("corrupt gzip stream errors retry", C(zlib.error("x")), backfill.RETRY),
+        check("silver pull_requests: duplicates and [bot] actors removed", [r.get("id") for r in silver_rows("pull_requests")], ["1", "2", "3"]),
+        check("silver pull_requests: column order", list((silver_rows("pull_requests") or [{}])[0].keys()), ["id", "created_at", "actor_id", "actor_login", "repo_id", "repo_name", "dt", "hour", "action", "pr_id", "pr_number", "head_repo_id", "base_repo_id", "from_fork"]),
+        check("silver pull_requests: action, pr_id, pr_number", [(r.get("action"), r.get("pr_id"), r.get("pr_number")) for r in silver_rows("pull_requests")], [("opened", 9001, 7), ("merged", 9001, 7), ("opened", 9002, 8)]),
+        check("silver pull_requests: head and base repo ids", [(r.get("head_repo_id"), r.get("base_repo_id")) for r in silver_rows("pull_requests")], [(600, 500), (500, 500), (None, 500)]),
+        check("silver pull_requests: from_fork true, false, NULL when head repo missing", [r.get("from_fork") for r in silver_rows("pull_requests")], [True, False, None]),
+        check("silver issues: action, ids, author and title", [(r.get("id"), r.get("action"), r.get("issue_id"), r.get("issue_number"), r.get("issue_author"), r.get("title")) for r in silver_rows("issues")], [("5", "opened", 7001, 9, "alice", "Crash on start")]),
+        check("silver stars: [bot] stargazer removed", [(r.get("id"), r.get("actor_login"), r.get("repo_name")) for r in silver_rows("stars")], [("6", "dave", "org/proj")]),
+        check("silver reviews: action, pr_number, review_id, state", [(r.get("id"), r.get("action"), r.get("pr_number"), r.get("review_id"), r.get("state")) for r in silver_rows("reviews")], [("7", "created", 7, 8001, "approved")]),
+        check("silver common columns carry dt and hour", [(r.get("dt"), r.get("hour")) for r in silver_rows("stars")], [("2026-09-23", 12)]),
+        check("silver_sql rejects an unknown table", raises(ValueError, lambda: silver.silver_sql("pushes")), True),
     ]
 
     print()
