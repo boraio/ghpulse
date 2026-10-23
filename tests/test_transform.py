@@ -70,6 +70,36 @@ def check(label: str, got, want) -> bool:
     return ok
 
 
+SILVER_EVENTS = [
+    # (id, type, actor_id, actor_login, repo_id, repo_name, payload); "2" is duplicated on purpose.
+    ("1", "PullRequestEvent", 10, "alice", 500, "org/proj", {"action": "opened", "number": 7, "pull_request": {"id": 9001, "number": 7, "head": {"repo": {"id": 600}}, "base": {"repo": {"id": 500}}}}),
+    ("2", "PullRequestEvent", 11, "bob", 500, "org/proj", {"action": "merged", "number": 7, "pull_request": {"id": 9001, "number": 7, "head": {"repo": {"id": 500}}, "base": {"repo": {"id": 500}}}}),
+    ("2", "PullRequestEvent", 11, "bob", 500, "org/proj", {"action": "merged", "number": 7, "pull_request": {"id": 9001, "number": 7, "head": {"repo": {"id": 500}}, "base": {"repo": {"id": 500}}}}),
+    ("3", "PullRequestEvent", 12, "carol", 500, "org/proj", {"action": "opened", "number": 8, "pull_request": {"id": 9002, "number": 8, "head": {"repo": None}, "base": {"repo": {"id": 500}}}}),
+    ("4", "PullRequestEvent", 13, "dependabot[bot]", 500, "org/proj", {"action": "opened", "number": 9, "pull_request": {"id": 9003, "number": 9, "head": {"repo": {"id": 500}}, "base": {"repo": {"id": 500}}}}),
+    ("5", "IssuesEvent", 10, "alice", 500, "org/proj", {"action": "opened", "issue": {"id": 7001, "number": 9, "title": "Crash on start", "user": {"login": "alice"}}}),
+    ("6", "WatchEvent", 14, "dave", 500, "org/proj", {"action": "started"}),
+    ("7", "PullRequestReviewEvent", 11, "bob", 500, "org/proj", {"action": "created", "pull_request": {"id": 9001, "number": 7}, "review": {"id": 8001, "state": "approved"}}),
+    ("8", "WatchEvent", 15, "eve[bot]", 501, "org/other", {"action": "started"}),
+]
+
+def silver_rows(table: str, events=SILVER_EVENTS) -> list[dict]:
+    """Run silver.silver_sql(table) over synthetic bronze rows; return the rows as dicts sorted by id."""
+    import silver
+    con = duckdb.connect()
+    # Only the bronze columns silver reads; the real actor and repo structs carry more fields.
+    con.execute("CREATE TABLE bronze (id VARCHAR, type VARCHAR, actor STRUCT(id BIGINT, login VARCHAR), "
+                "repo STRUCT(id BIGINT, name VARCHAR), payload JSON, created_at TIMESTAMP, dt VARCHAR, hour INTEGER)")
+    for i, (eid, etype, aid, login, rid, rname, payload) in enumerate(events):
+        con.execute("INSERT INTO bronze VALUES (?, ?, struct_pack(id := CAST(? AS BIGINT), login := CAST(? AS VARCHAR)), "
+                    "struct_pack(id := CAST(? AS BIGINT), name := CAST(? AS VARCHAR)), CAST(? AS JSON), "
+                    "CAST(? AS TIMESTAMP), '2026-09-23', 12)",
+                    [eid, etype, aid, login, rid, rname, json.dumps(payload), f"2026-09-23 12:00:{i:02d}"])
+    cur = con.execute(silver.silver_sql(table))
+    cols = [d[0] for d in cur.description]
+    return sorted((dict(zip(cols, row)) for row in cur.fetchall()), key=lambda r: str(r.get("id")))
+
+
 def main() -> int:
     tmp = Path(tempfile.mkdtemp())
     src, dst = tmp / "events.json", tmp / "out.parquet"
