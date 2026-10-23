@@ -29,7 +29,7 @@ _SPEC = {
 
 
 def silver_sql(table: str) -> str:
-    """Return the SELECT that builds one silver table from a relation named `bronze` (stub)."""
+    """Return the SELECT that builds one silver table from a relation named `bronze`."""
     if table not in _SPEC:
         raise ValueError(f"unknown silver table: {table!r}")
     event_type, extra = _SPEC[table]
