@@ -33,7 +33,10 @@ REF_NONPUSH = 16893
 
 def is_stable(n: int, push: int) -> bool:
     """True when an hour looks like normal capture: pushes present, push share 0.50-0.95 and non-push events within 3x of REF_NONPUSH, bounds inclusive."""
-    return None  # stub
+    if n <= 0 or push < 1:
+        return False
+    nonpush = n - push
+    return 0.50 <= push / n <= 0.95 and REF_NONPUSH / 3 <= nonpush <= REF_NONPUSH * 3
 
 
 def silver_sql(table: str) -> str:
