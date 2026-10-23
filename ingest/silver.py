@@ -4,6 +4,29 @@ from __future__ import annotations
 
 TABLES = ("pull_requests", "issues", "stars", "reviews")
 
+_COMMON = "id, created_at, actor.id AS actor_id, actor.login AS actor_login, repo.id AS repo_id, repo.name AS repo_name, dt, hour"
+
+# Payload fields per table. GitHub's slimmed PR payloads (2025-10-07) carry no author, merged flag or size.
+_SPEC = {
+    "pull_requests": ("PullRequestEvent", "json_extract_string(payload, '$.action') AS action, "
+                      "CAST(json_extract_string(payload, '$.pull_request.id') AS BIGINT) AS pr_id, "
+                      "CAST(json_extract_string(payload, '$.pull_request.number') AS BIGINT) AS pr_number, "
+                      "CAST(json_extract_string(payload, '$.pull_request.head.repo.id') AS BIGINT) AS head_repo_id, "
+                      "CAST(json_extract_string(payload, '$.pull_request.base.repo.id') AS BIGINT) AS base_repo_id, "
+                      "CAST(json_extract_string(payload, '$.pull_request.head.repo.id') AS BIGINT) "
+                      "<> CAST(json_extract_string(payload, '$.pull_request.base.repo.id') AS BIGINT) AS from_fork"),
+    "issues": ("IssuesEvent", "json_extract_string(payload, '$.action') AS action, "
+               "CAST(json_extract_string(payload, '$.issue.id') AS BIGINT) AS issue_id, "
+               "CAST(json_extract_string(payload, '$.issue.number') AS BIGINT) AS issue_number, "
+               "json_extract_string(payload, '$.issue.user.login') AS issue_author, "
+               "json_extract_string(payload, '$.issue.title') AS title"),
+    "stars": ("WatchEvent", ""),
+    "reviews": ("PullRequestReviewEvent", "json_extract_string(payload, '$.action') AS action, "
+                "CAST(json_extract_string(payload, '$.pull_request.number') AS BIGINT) AS pr_number, "
+                "CAST(json_extract_string(payload, '$.review.id') AS BIGINT) AS review_id, "
+                "json_extract_string(payload, '$.review.state') AS state"),
+}
+
 
 def silver_sql(table: str) -> str:
     """Return the SELECT that builds one silver table from a relation named `bronze` (stub)."""
