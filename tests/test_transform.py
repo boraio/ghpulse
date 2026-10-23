@@ -351,6 +351,17 @@ def main() -> int:
         check("silver reviews: action, pr_number, review_id, state", [(r.get("id"), r.get("action"), r.get("pr_number"), r.get("review_id"), r.get("state")) for r in silver_rows("reviews")], [("7", "created", 7, 8001, "approved")]),
         check("silver common columns carry dt and hour", [(r.get("dt"), r.get("hour")) for r in silver_rows("stars")], [("2026-09-23", 12)]),
         check("silver_sql rejects an unknown table", raises(ValueError, lambda: silver.silver_sql("pushes")), True),
+        check("is_stable: a typical hour", silver.is_stable(90000, 70000), True),
+        check("is_stable: no pushes", silver.is_stable(5000, 0), False),
+        check("is_stable: an empty hour", silver.is_stable(0, 0), False),
+        check("is_stable: push share below 0.50", silver.is_stable(80000, 20000), False),
+        check("is_stable: push share above 0.95 with normal non-push volume", silver.is_stable(126000, 120000), False),
+        check("is_stable: non-push volume below a third of the reference", silver.is_stable(8000, 6000), False),
+        check("is_stable: non-push volume above three times the reference", silver.is_stable(300000, 240000), False),
+        check("is_stable: push share of exactly 0.50 passes", silver.is_stable(40000, 20000), True),
+        check("is_stable: push share of exactly 0.95 passes", silver.is_stable(200000, 190000), True),
+        check("is_stable: non-push of exactly REF_NONPUSH / 3 passes", silver.is_stable(22524, 16893), True),
+        check("is_stable: non-push of exactly REF_NONPUSH * 3 passes", silver.is_stable(101358, 50679), True),
     ]
 
     print()
