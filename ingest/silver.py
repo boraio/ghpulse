@@ -96,3 +96,59 @@ def silver_todo(keys, silver_statuses, silver_present, bronze_statuses, mode) ->
     """Hours to build: backfill.plan() over the silver manifest, limited to hours whose bronze is ingested."""
     # An hour with no bronze (absent upstream, failed or never fetched) is skipped, not failed.
     return [k for k in backfill.plan(keys, silver_statuses, silver_present, mode) if bronze_statuses.get(k) == backfill.INGESTED]
+
+def main(argv=None) -> int:
+    """Build silver for an inclusive range of UTC hours, resuming from the silver manifest."""
+    p = argparse.ArgumentParser(description=main.__doc__)
+    p.add_argument("--start", required=True, help="first hour, e.g. 2026-09-22T00 (UTC)")
+    p.add_argument("--end", required=True, help="last hour, inclusive")
+    p.add_argument("--bronze-root", default="s3://ghpulse/bronze/events")
+    p.add_argument("--bronze-manifest-root", default="s3://ghpulse/_manifest/events")
+    p.add_argument("--silver-root", default="s3://ghpulse/silver")
+    p.add_argument("--manifest-root", default="s3://ghpulse/_manifest/silver")
+    p.add_argument("--force", action="store_true", help="rebuild every hour that has bronze")
+    p.add_argument("--yes", action="store_true", help="confirm --force")
+    p.add_argument("--dry-run", action="store_true", help="show the plan and stop")
+    p.add_argument("--status", action="store_true", help="report the silver manifest and stop")
+    args = p.parse_args(argv)
+    if args.force and not args.yes:
+        p.error("--force rebuilds every hour; add --yes to confirm")
+    keys = backfill.hour_range(backfill.parse_hour(args.start), backfill.parse_hour(args.end))
+    roots = (args.bronze_root, args.bronze_manifest_root, args.silver_root, args.manifest_root)
+    con = duckdb.connect()
+    con.execute("SET enable_progress_bar=false")
+    if any(r.startswith("s3://") for r in roots):
+        fetch.s3_config(con)
+    statuses = backfill.read_state(con, args.manifest_root)
+    present = backfill.present_partitions(con, f"{args.silver_root}/pull_requests")
+    bronze = backfill.read_state(con, args.bronze_manifest_root)
+    if args.status:
+        for name, count in backfill.status_counts(keys, statuses, present).items():
+            print(f"{name:<12} {count}")
+        print(f"{'no bronze':<12} {sum(1 for k in keys if bronze.get(k) != backfill.INGESTED)}")
+        return 0
+    todo = silver_todo(keys, statuses, present, bronze, "force" if args.force else "resume")
+    print(f"{len(todo)} of {len(keys)} hours to build", flush=True)
+    if args.dry_run:
+        for d, h in todo:
+            print(f"  {d} {h:02d}")
+        return 0
+    version = backfill.code_version()
+    failed = 0
+    for d, h in todo:
+        try:
+            rec = silver_one(con, (d, h), bronze_root=args.bronze_root, silver_root=args.silver_root,
+                             manifest_root=args.manifest_root, code_version=version)
+        # One bad hour is recorded and the run moves on; its failed marker makes a rerun retry it.
+        except Exception as exc:  # noqa: BLE001
+            rec = {"dt": d, "hour": h, "status": backfill.FAILED, "error": repr(exc)[:500], "code_version": version}
+            backfill.write_marker(con, backfill.marker_path(args.manifest_root, d, h), rec)
+            failed += 1
+        counts = " ".join(f"{t}={rec.get(f'{t}_rows')}" for t in TABLES)
+        print(f"  {d} {h:02d} {rec['status']} {counts}", flush=True)
+    print(f"done: {len(todo)} hours, {failed} failed")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
