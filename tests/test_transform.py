@@ -411,6 +411,15 @@ def main() -> int:
         check("is_stable: push share of exactly 0.95 passes", silver.is_stable(200000, 190000), True),
         check("is_stable: non-push of exactly REF_NONPUSH / 3 passes", silver.is_stable(22524, 16893), True),
         check("is_stable: non-push of exactly REF_NONPUSH * 3 passes", silver.is_stable(101358, 50679), True),
+        check("silver_one: marks the hour ingested", silver_one_result()[0].get("status"), "ingested"),
+        check("silver_one: writes a Parquet file for every table", [parquet_count(backfill.bronze_file(str(silver_one_result()[1] / "silver" / t), *SILVER_HOUR)) is not None for t in silver.TABLES], [True, True, True, True]),
+        check("silver_one: rows out per table", [silver_one_result()[0].get(f"{t}_rows") for t in silver.TABLES], [3, 1, 1, 1]),
+        check("silver_one: pull_requests in, bots, duplicates", [silver_one_result()[0].get(f"pull_requests_{k}") for k in ("in", "bots", "dups")], [5, 1, 1]),
+        check("silver_one: stars in, bots, duplicates", [silver_one_result()[0].get(f"stars_{k}") for k in ("in", "bots", "dups")], [2, 1, 0]),
+        check("silver_one: bronze rows, pushes and stable flag", [silver_one_result()[0].get(k) for k in ("bronze_rows", "push", "stable")], [11, 2, False]),
+        check("silver_one: in - bots - dups = rows for every table", all(silver_one_result()[0].get(f"{t}_in", -1) - silver_one_result()[0].get(f"{t}_bots", 0) - silver_one_result()[0].get(f"{t}_dups", 0) == silver_one_result()[0].get(f"{t}_rows") for t in silver.TABLES), True),
+        check("silver_one: marker on disk matches the record", [(json_record(backfill.marker_path(str(silver_one_result()[1] / "manifest"), *SILVER_HOUR)) or {}).get(k) for k in ("status", "pull_requests_rows", "stable")], ["ingested", 3, False]),
+        check("silver_one: the pull_requests file holds the deduplicated rows", parquet_count(backfill.bronze_file(str(silver_one_result()[1] / "silver" / "pull_requests"), *SILVER_HOUR)), 3),
     ]
 
     print()
