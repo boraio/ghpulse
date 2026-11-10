@@ -56,3 +56,9 @@ def silver_sql(table: str) -> str:
         f"WHERE type = '{event_type}' AND actor.login NOT LIKE '%[bot]' "
         "QUALIFY row_number() OVER (PARTITION BY id ORDER BY created_at) = 1"
     )
+
+
+
+def silver_one(con, key, *, bronze_root: str, silver_root: str, manifest_root: str, code_version: str = "unknown") -> dict:
+    """Build the four silver tables for one bronze hour, then write its marker; returns the marker record."""
+    return {}  # stub
