@@ -100,6 +100,55 @@ def silver_rows(table: str, events=SILVER_EVENTS) -> list[dict]:
     return sorted((dict(zip(cols, row)) for row in cur.fetchall()), key=lambda r: str(r.get("id")))
 
 
+import functools
+
+SILVER_HOUR = ("2026-09-23", 12)
+SILVER_PUSHES = [
+    ("p1", "PushEvent", 20, "frank", 502, "frank/site", {"push_id": 1}),
+    ("p2", "PushEvent", 20, "frank", 502, "frank/site", {"push_id": 2}),
+]
+
+
+def json_record(path) -> dict | None:
+    """First record of a JSON file as a dict, or None when the file is missing."""
+    import pathlib
+    if not pathlib.Path(path).exists():
+        return None
+    cur = duckdb.connect().execute(f"SELECT * FROM read_json('{path}')")
+    return dict(zip([d[0] for d in cur.description], cur.fetchone()))
+
+
+def parquet_count(path) -> int | None:
+    """Row count of a Parquet file, or None when the file is missing."""
+    import pathlib
+    if not pathlib.Path(path).exists():
+        return None
+    return duckdb.connect().execute(f"SELECT count(*) FROM read_parquet('{path}')").fetchone()[0]
+
+
+@functools.lru_cache(maxsize=None)
+def silver_one_result():
+    """Write a synthetic bronze hour to a temp dir, run silver.silver_one on it once, return (record, root)."""
+    import pathlib
+    import backfill
+    import silver
+    root = pathlib.Path(tempfile.mkdtemp(prefix="silver_one_"))
+    src = backfill.bronze_file(str(root / "bronze"), *SILVER_HOUR)
+    pathlib.Path(src).parent.mkdir(parents=True)
+    con = duckdb.connect()
+    con.execute("CREATE TABLE b (id VARCHAR, type VARCHAR, actor STRUCT(id BIGINT, login VARCHAR), "
+                "repo STRUCT(id BIGINT, name VARCHAR), payload JSON, created_at TIMESTAMP, dt VARCHAR, hour INTEGER)")
+    for i, (eid, etype, aid, login, rid, rname, payload) in enumerate(SILVER_EVENTS + SILVER_PUSHES):
+        con.execute("INSERT INTO b VALUES (?, ?, struct_pack(id := CAST(? AS BIGINT), login := CAST(? AS VARCHAR)), "
+                    "struct_pack(id := CAST(? AS BIGINT), name := CAST(? AS VARCHAR)), CAST(? AS JSON), "
+                    "CAST(? AS TIMESTAMP), ?, ?)",
+                    [eid, etype, aid, login, rid, rname, json.dumps(payload), f"2026-09-23 12:00:{i:02d}", *SILVER_HOUR])
+    con.execute(f"COPY b TO '{src}' (FORMAT PARQUET)")
+    rec = silver.silver_one(duckdb.connect(), SILVER_HOUR, bronze_root=str(root / "bronze"),
+                            silver_root=str(root / "silver"), manifest_root=str(root / "manifest"), code_version="test")
+    return rec, root
+
+
 def main() -> int:
     tmp = Path(tempfile.mkdtemp())
     src, dst = tmp / "events.json", tmp / "out.parquet"
