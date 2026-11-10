@@ -1,0 +1,10 @@
+model: openai/qwen2.5-coder-14b-instruct-q4_k_m.gguf
+openai-api-base: http://10.0.20.245:8000/v1
+openai-api-key: dummy
+edit-format: diff
+show-model-warnings: false
+read:
+  - CONVENTIONS.md
+attribute-co-authored-by: false
+attribute-author: false
+attribute-committer: false
