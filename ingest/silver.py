@@ -61,4 +61,27 @@ def silver_sql(table: str) -> str:
 
 def silver_one(con, key, *, bronze_root: str, silver_root: str, manifest_root: str, code_version: str = "unknown") -> dict:
     """Build the four silver tables for one bronze hour, then write its marker; returns the marker record."""
-    return {}  # stub
+    dt_iso, hour = key
+    src = backfill.bronze_file(bronze_root, dt_iso, hour)
+    con.execute(f"CREATE OR REPLACE TEMP TABLE bronze AS SELECT * FROM read_parquet('{src}', hive_partitioning=false)")
+    n, push = con.execute("SELECT count(*), count(*) FILTER (WHERE type = 'PushEvent') FROM bronze").fetchone()
+    rec = {"dt": dt_iso, "hour": hour, "status": backfill.INGESTED, "bronze_rows": n, "push": push, "stable": is_stable(n, push)}
+    for table in TABLES:
+        counts = (
+            "SELECT count(*), count(*) FILTER (WHERE actor.login LIKE '%[bot]'), "
+            "count(*) FILTER (WHERE actor.login NOT LIKE '%[bot]') "
+            "- count(DISTINCT id) FILTER (WHERE actor.login NOT LIKE '%[bot]') "
+            f"FROM bronze WHERE type = '{_SPEC[table][0]}'"
+        )
+        rows_in, bots, dups = con.execute(counts).fetchone()
+        out = backfill.bronze_file(f"{silver_root}/{table}", dt_iso, hour)
+        if not out.startswith("s3://"):
+            os.makedirs(os.path.dirname(out), exist_ok=True)
+        con.execute(f"COPY ({silver_sql(table)}) TO '{out}' (FORMAT PARQUET)")
+        rows_out = con.execute(f"SELECT count(*) FROM ({silver_sql(table)})").fetchone()[0]
+        rec.update({f"{table}_in": rows_in, f"{table}_bots": bots, f"{table}_dups": dups, f"{table}_rows": rows_out})
+    rec["finished_at"] = dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
+    rec["code_version"] = code_version
+    # The marker goes last, so a crash mid-hour leaves data without a marker, which a rerun redoes.
+    backfill.write_marker(con, backfill.marker_path(manifest_root, dt_iso, hour), rec)
+    return rec
