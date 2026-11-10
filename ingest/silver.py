@@ -89,4 +89,5 @@ def silver_one(con, key, *, bronze_root: str, silver_root: str, manifest_root: s
 
 def silver_todo(keys, silver_statuses, silver_present, bronze_statuses, mode) -> list:
     """Hours to build: backfill.plan() over the silver manifest, limited to hours whose bronze is ingested."""
-    return None  # stub
+    # An hour with no bronze (absent upstream, failed or never fetched) is skipped, not failed.
+    return [k for k in backfill.plan(keys, silver_statuses, silver_present, mode) if bronze_statuses.get(k) == backfill.INGESTED]
