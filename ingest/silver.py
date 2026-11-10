@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import datetime as dt
+import os
+
+import backfill
+
 TABLES = ("pull_requests", "issues", "stars", "reviews")
 
 _COMMON = "id, created_at, actor.id AS actor_id, actor.login AS actor_login, repo.id AS repo_id, repo.name AS repo_name, dt, hour"
