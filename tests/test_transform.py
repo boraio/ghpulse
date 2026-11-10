@@ -424,6 +424,11 @@ def main() -> int:
         check("silver_one: in - bots - dups = rows for every table", all(silver_one_result()[0].get(f"{t}_in", -1) - silver_one_result()[0].get(f"{t}_bots", 0) - silver_one_result()[0].get(f"{t}_dups", 0) == silver_one_result()[0].get(f"{t}_rows") for t in silver.TABLES), True),
         check("silver_one: marker on disk matches the record", [(json_record(backfill.marker_path(str(silver_one_result()[1] / "manifest"), *SILVER_HOUR)) or {}).get(k) for k in ("status", "pull_requests_rows", "stable")], ["ingested", 3, False]),
         check("silver_one: the pull_requests file holds the deduplicated rows", parquet_count(backfill.bronze_file(str(silver_one_result()[1] / "silver" / "pull_requests"), *SILVER_HOUR)), 3),
+        check("silver_todo: skips built hours and hours without bronze", silver.silver_todo(TODO_KEYS, {TODO_KEYS[0]: "ingested"}, {TODO_KEYS[0]}, TODO_BRONZE, "resume"), [TODO_KEYS[1]]),
+        check("silver_todo: force rebuilds every hour that has bronze", silver.silver_todo(TODO_KEYS, {TODO_KEYS[0]: "ingested"}, {TODO_KEYS[0]}, TODO_BRONZE, "force"), [TODO_KEYS[0], TODO_KEYS[1]]),
+        check("silver_todo: rebuilds a built hour whose silver data is missing", silver.silver_todo(TODO_KEYS, {TODO_KEYS[0]: "ingested"}, set(), TODO_BRONZE, "resume"), [TODO_KEYS[0], TODO_KEYS[1]]),
+        check("silver_todo: retries a failed hour", silver.silver_todo(TODO_KEYS, {TODO_KEYS[0]: "ingested", TODO_KEYS[1]: "failed"}, {TODO_KEYS[0], TODO_KEYS[1]}, TODO_BRONZE, "resume"), [TODO_KEYS[1]]),
+        check("silver_todo: never builds an hour whose bronze is absent or missing", silver.silver_todo(TODO_KEYS, {}, set(), TODO_BRONZE, "force"), [TODO_KEYS[0], TODO_KEYS[1]]),
     ]
 
     print()
