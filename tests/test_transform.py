@@ -149,6 +149,10 @@ def silver_one_result():
     return rec, root
 
 
+TODO_KEYS = [("2026-09-23", h) for h in range(4)]
+# Bronze: hours 0 and 1 ingested, hour 2 absent upstream, hour 3 never attempted.
+TODO_BRONZE = {TODO_KEYS[0]: "ingested", TODO_KEYS[1]: "ingested", TODO_KEYS[2]: "absent"}
+
 def main() -> int:
     tmp = Path(tempfile.mkdtemp())
     src, dst = tmp / "events.json", tmp / "out.parquet"
