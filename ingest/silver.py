@@ -7,9 +7,8 @@ import datetime as dt
 import os
 import sys
 
-import duckdb
-
 import backfill
+import duckdb
 import fetch
 
 TABLES = ("pull_requests", "issues", "stars", "reviews")
