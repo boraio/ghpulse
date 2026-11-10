@@ -85,3 +85,8 @@ def silver_one(con, key, *, bronze_root: str, silver_root: str, manifest_root: s
     # The marker goes last, so a crash mid-hour leaves data without a marker, which a rerun redoes.
     backfill.write_marker(con, backfill.marker_path(manifest_root, dt_iso, hour), rec)
     return rec
+
+
+def silver_todo(keys, silver_statuses, silver_present, bronze_statuses, mode) -> list:
+    """Hours to build: backfill.plan() over the silver manifest, limited to hours whose bronze is ingested."""
+    return None  # stub
