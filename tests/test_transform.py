@@ -193,6 +193,7 @@ def main() -> int:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ingest"))
     import backfill
     import fetch
+    import quality
     import silver
 
     results += [
