@@ -7,7 +7,7 @@ interrupt-and-resume test, and turning off DuckDB's progress bars in workers. Th
 step 0 of `milestone_01.md`; fold what matters into the README and retire it
 when step 0 merges.
 
-**Update, 2026-10-23: step 0 is complete; only the merge of PR #1 remains.**
+**Update, 2026-10-23: step 0 is complete and merged to `main` as `201a19d` (PR #1).**
 Interrupt-and-resume test on 2026-09-15…21 (168 hours, 4 workers): stopped with
 Ctrl-C after 51 hours had markers. `--status` then showed 51 ingested, 117
 unattempted, 0 failed, 0 drift, and `--dry-run` planned exactly 117. The resumed

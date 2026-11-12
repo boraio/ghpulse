@@ -176,3 +176,20 @@ a positive one with a leaky split.
   month is chosen from hours where both pushes and non-push events are present
   in normal proportions. A proposed rule and its numbers are in the
   measurements page.
+- **Decided 2026-10-23: silver in DuckDB, not Spark** (see `PROJECT.md`, Why
+  this architecture). Bronze now covers 2026-09-01…10-22 (1,248 hours); no
+  30-day window passes the stability rule in full, so silver carries a per-hour
+  `stable` flag and the window is chosen at step 5 with a clean evaluation week
+  (details in the measurements page).
+- **Finding 2026-10-23: GH Archive holds about 1–2% of PR activity** (six
+  repos checked against GitHub's search API), and PR payloads no longer carry
+  author, `merged` or size fields. The per-actor funnel and the recommender's
+  data need rethinking before gold; see the measurements page.
+- **Recommender viability measured 2026-10-23:** about 33k evaluable actors on
+  a Sep 7 – Oct 6 temporal split with unstable hours masked, so the recommender
+  proceeds on GH Archive's sample; the per-actor funnel becomes repo-level
+  (decided). Silver design is in `milestone_01_step3.md`.
+- **Step 3 (silver) built and reconciled on Sep 22–28** (2026-11-12): 168 hours,
+  0 failed; bronze in = `[bot]` + duplicates + silver rows for every hour and
+  table; no duplicate id across the week; `[bot]` share 35.5% of PR events,
+  35.2% of reviews, 16.1% of issues, 0% of stars.
