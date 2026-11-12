@@ -430,6 +430,11 @@ def main() -> int:
         check("silver_todo: rebuilds a built hour whose silver data is missing", silver.silver_todo(TODO_KEYS, {TODO_KEYS[0]: "ingested"}, set(), TODO_BRONZE, "resume"), [TODO_KEYS[0], TODO_KEYS[1]]),
         check("silver_todo: retries a failed hour", silver.silver_todo(TODO_KEYS, {TODO_KEYS[0]: "ingested", TODO_KEYS[1]: "failed"}, {TODO_KEYS[0], TODO_KEYS[1]}, TODO_BRONZE, "resume"), [TODO_KEYS[1]]),
         check("silver_todo: never builds an hour whose bronze is absent or missing", silver.silver_todo(TODO_KEYS, {}, set(), TODO_BRONZE, "force"), [TODO_KEYS[0], TODO_KEYS[1]]),
+        check("quality: a good silver marker has no violations", quality.marker_violations(silver_one_result()[0]), []),
+        check("quality: a marker count off by one is caught", [("pull_requests" in v) for v in quality.marker_violations({**silver_one_result()[0], "pull_requests_rows": 2})], [True]),
+        check("quality: a failed hour is one violation", len(quality.marker_violations({"dt": "2026-09-23", "hour": 12, "status": "failed"})), 1),
+        check("quality: missing per-table counts are a violation", [("stars" in v) for v in quality.marker_violations({k: v for k, v in silver_one_result()[0].items() if not k.startswith("stars_")})], [True]),
+        check("quality: each table that fails to reconcile is reported", len(quality.marker_violations({**silver_one_result()[0], "issues_rows": 0, "reviews_bots": 5})), 2),
     ]
 
     print()
