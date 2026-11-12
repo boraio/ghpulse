@@ -33,4 +33,25 @@ REQUIRED = {
 
 def table_violations(con, table: str, files: list[str]) -> list[str]:
     """Violations across one table's silver files: null required columns, ids repeated anywhere, [bot] actors, rows outside their partition."""
-    return ["stub"] * 3  # stub: wrong on purpose, so every check fails before the implementation
+    if not files:
+        return []
+    # Load locally first: grouped count(DISTINCT) over remote Parquet has crashed DuckDB before (PROJECT.md).
+    con.execute(f"CREATE OR REPLACE TEMP TABLE q AS SELECT * FROM read_parquet({list(files)}, filename=true, hive_partitioning=false)")
+    out = []
+    for col in COMMON_REQUIRED + REQUIRED[table]:
+        n = con.execute(f"SELECT count(*) FROM q WHERE {col} IS NULL").fetchone()[0]
+        if n:
+            out.append(f"{table}: {n} rows with null {col}")
+    dup = con.execute("SELECT count(id) - count(DISTINCT id) FROM q").fetchone()[0]
+    if dup:
+        out.append(f"{table}: {dup} duplicate ids")
+    bots = con.execute("SELECT count(*) FROM q WHERE actor_login LIKE '%[bot]'").fetchone()[0]
+    if bots:
+        out.append(f"{table}: {bots} rows from [bot] actors")
+    misplaced = con.execute(
+        "SELECT count(*) FROM q WHERE filename NOT LIKE "
+        "('%/dt=' || dt || '/hour=' || lpad(CAST(hour AS VARCHAR), 2, '0') || '/%')"
+    ).fetchone()[0]
+    if misplaced:
+        out.append(f"{table}: {misplaced} rows whose dt/hour do not match their partition path")
+    return out
