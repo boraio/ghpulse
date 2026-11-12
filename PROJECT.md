@@ -42,6 +42,13 @@ Spark at that scale would be the wrong engineering call. Spark earns its place
 at milestone 1, where the silver transforms need shuffles (dedup across
 partition boundaries, windowing per actor over a month) rather than scans.
 
+**Revised 2026-10-23: silver is built in DuckDB, not Spark.** The measurements
+removed both reasons above: duplicates occur only within single hours (5 in
+14.9M rows), so dedup needs no cross-partition shuffle, and per-actor windowing
+belongs to gold. Silver is a per-hour scan, filter and dedup, so it runs hour
+by hour like the bronze backfill and never needs a month of bronze in one query.
+Spark is introduced where a real shuffle or ALS appears (gold or milestone 2).
+
 **Bronze is immutable per-partition.** Reprocessing after a schema change costs
 one re-run of the affected partitions, not a migration. This has already paid
 for itself twice.
@@ -60,7 +67,8 @@ project demonstrates.
   `/etc/jenga.env`. Never in the repo.
 - **Spark**: `spark-client` against the Kubernetes cluster (not Kyuubi — see
   non-goals)
-- **CI**: GitHub Actions on self-hosted runners in the cluster (ARC)
+- **CI**: GitHub Actions on GitHub-hosted `ubuntu-latest` runners, since the repo
+  became public (2026-11-12); the self-hosted ARC runners in the cluster were used before
 - **Repo**: `boraio/ghpulse`
 
 ## Current state
@@ -70,7 +78,7 @@ transform, land on Ceph, query from DuckDB. 100,774 events, 17,948 actors,
 22,661 repos, 16 event types. Nine offline checks green. CI passing.
 
 **Milestone 1, step 0 (backfill mechanics) is complete**, last updated
-2026-10-23, on branch `backfill-mechanics` (draft PR #1, to be squash-merged).
+2026-10-23, and merged to `main` as `201a19d` (PR #1, squash-merged).
 Bronze covers 2026-09-01…28 contiguously, 672 hours.
 
 Done and verified offline:
@@ -111,8 +119,13 @@ Done and verified offline:
   lint with the pinned version, `compileall`, and the offline checks, so the
   checks are verified on a clean runner, not only locally.
 
-Next: decide the stability rule and the dedup window, then silver transforms
-in Spark (step 3). Decisions, remaining work and open unknowns
+**Step 3 (silver, DuckDB) is in progress** on branch `silver`: `silver_sql` and
+`is_stable` built test-first, 99 PASS; the per-hour runner is next (see
+**`milestone_01_step3.md`**). The recommender proceeds on GH Archive's
+~2% sample (decided 2026-10-23).
+
+Next: silver transforms in DuckDB (step 3), developed on Sep 22–28; the
+month window is chosen at step 5. Decisions, remaining work and open unknowns
 are in **`milestone_01_step0.md`**.
 
 ## Milestones
@@ -264,6 +277,10 @@ wrong in milestone 1 step 0.
   print only the intended removals), the FAIL and PASS counts (PASS may only
   grow), and `git diff <base> HEAD --stat`. A green suite on its own is not
   evidence: the model once passed it by deleting the tests.
+- **The removed-lines guard is blind to Markdown.** A removed bullet appears in
+  the diff as `-- …` and a removed empty line as `-`, and `'^-[^-]'` filters out
+  both. For docs use `grep '^-' | grep -v '^--- '`, and when line wrapping
+  differs compare word streams (`tr -s '[:space:]' '\n'`) rather than lines.
 - **Test first, against a stub that returns wrong values** (not one that
   raises), so the checks fail cleanly for the right reason.
 - **Read every implementation, even when green.** `write_marker` once passed
@@ -290,6 +307,27 @@ wrong in milestone 1 step 0.
   and the pushed branch is never rewritten.
 - Observed limits: context of 16384 tokens per slot and a 4096-token output
   cap.
+  With `tests/test_transform.py` this long, opening it beside another file plus
+  the repo map overran the context. Open only the file a prompt edits, and
+  start aider with `--map-tokens 0` for pure insertions.
+- **aider's config is tracked and attribution is off** (2026-11-10).
+  `.aider.conf.yml` and `.aider.model.settings.yml` were hidden by the `.aider*`
+  ignore rule, so a fresh clone would have lost the 0.0 temperature; `.gitignore`
+  now excepts both, and the chat history stays ignored. aider refuses to edit
+  ignored files, which is why the config change itself was made with a shell
+  append. `attribute-co-authored-by`, `attribute-author` and
+  `attribute-committer` are all `false`: turning off only the first would make
+  aider fall back to adding `(aider)` to the author and committer names.
+  The 230 `Co-authored-by: aider` trailers already in history were removed on
+  2026-11-10 with `git filter-repo` (messages only, and only where the trailer
+  appeared), after a full backup bundle at
+  `~/ghpulse-before-rewrite-2026-11-10.bundle`. Verified before pushing: 0
+  trailers, identical tree hashes and commit counts on `main` and `silver`.
+  Both were force-pushed (`main` now `d895bdd`, `silver` `a4aea2d`) and the
+  merged `backfill-mechanics` branch was deleted locally and on GitHub. PR #1's
+  page on GitHub still shows the original commits, which only GitHub support can
+  purge. Squash merges should use "Pull request title and description" as the
+  default message so branch commit messages are not pasted into `main`.
 - **Temperature is set explicitly to `0.0`** in `.aider.model.settings.yml`
   (`extra_params: temperature: 0.0`; it was 0.1). Verified that the file's value
   reaches the server: the llama.cpp server's own default is 0.8 (from `/props`),

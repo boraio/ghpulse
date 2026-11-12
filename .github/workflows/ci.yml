@@ -14,7 +14,7 @@ on:
 
 jobs:
   lint:
-    runs-on: arc-runner-set
+    runs-on: ubuntu-latest
     steps:
       # v5/v6 run on Node 24; v4/v5 were Node 20, which GitHub is deprecating.
       - uses: actions/checkout@v5

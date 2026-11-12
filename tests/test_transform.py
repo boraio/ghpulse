@@ -70,6 +70,89 @@ def check(label: str, got, want) -> bool:
     return ok
 
 
+SILVER_EVENTS = [
+    # (id, type, actor_id, actor_login, repo_id, repo_name, payload); "2" is duplicated on purpose.
+    ("1", "PullRequestEvent", 10, "alice", 500, "org/proj", {"action": "opened", "number": 7, "pull_request": {"id": 9001, "number": 7, "head": {"repo": {"id": 600}}, "base": {"repo": {"id": 500}}}}),
+    ("2", "PullRequestEvent", 11, "bob", 500, "org/proj", {"action": "merged", "number": 7, "pull_request": {"id": 9001, "number": 7, "head": {"repo": {"id": 500}}, "base": {"repo": {"id": 500}}}}),
+    ("2", "PullRequestEvent", 11, "bob", 500, "org/proj", {"action": "merged", "number": 7, "pull_request": {"id": 9001, "number": 7, "head": {"repo": {"id": 500}}, "base": {"repo": {"id": 500}}}}),
+    ("3", "PullRequestEvent", 12, "carol", 500, "org/proj", {"action": "opened", "number": 8, "pull_request": {"id": 9002, "number": 8, "head": {"repo": None}, "base": {"repo": {"id": 500}}}}),
+    ("4", "PullRequestEvent", 13, "dependabot[bot]", 500, "org/proj", {"action": "opened", "number": 9, "pull_request": {"id": 9003, "number": 9, "head": {"repo": {"id": 500}}, "base": {"repo": {"id": 500}}}}),
+    ("5", "IssuesEvent", 10, "alice", 500, "org/proj", {"action": "opened", "issue": {"id": 7001, "number": 9, "title": "Crash on start", "user": {"login": "alice"}}}),
+    ("6", "WatchEvent", 14, "dave", 500, "org/proj", {"action": "started"}),
+    ("7", "PullRequestReviewEvent", 11, "bob", 500, "org/proj", {"action": "created", "pull_request": {"id": 9001, "number": 7}, "review": {"id": 8001, "state": "approved"}}),
+    ("8", "WatchEvent", 15, "eve[bot]", 501, "org/other", {"action": "started"}),
+]
+
+def silver_rows(table: str, events=SILVER_EVENTS) -> list[dict]:
+    """Run silver.silver_sql(table) over synthetic bronze rows; return the rows as dicts sorted by id."""
+    import silver
+    con = duckdb.connect()
+    # Only the bronze columns silver reads; the real actor and repo structs carry more fields.
+    con.execute("CREATE TABLE bronze (id VARCHAR, type VARCHAR, actor STRUCT(id BIGINT, login VARCHAR), "
+                "repo STRUCT(id BIGINT, name VARCHAR), payload JSON, created_at TIMESTAMP, dt VARCHAR, hour INTEGER)")
+    for i, (eid, etype, aid, login, rid, rname, payload) in enumerate(events):
+        con.execute("INSERT INTO bronze VALUES (?, ?, struct_pack(id := CAST(? AS BIGINT), login := CAST(? AS VARCHAR)), "
+                    "struct_pack(id := CAST(? AS BIGINT), name := CAST(? AS VARCHAR)), CAST(? AS JSON), "
+                    "CAST(? AS TIMESTAMP), '2026-09-23', 12)",
+                    [eid, etype, aid, login, rid, rname, json.dumps(payload), f"2026-09-23 12:00:{i:02d}"])
+    cur = con.execute(silver.silver_sql(table))
+    cols = [d[0] for d in cur.description]
+    return sorted((dict(zip(cols, row)) for row in cur.fetchall()), key=lambda r: str(r.get("id")))
+
+
+import functools
+
+SILVER_HOUR = ("2026-09-23", 12)
+SILVER_PUSHES = [
+    ("p1", "PushEvent", 20, "frank", 502, "frank/site", {"push_id": 1}),
+    ("p2", "PushEvent", 20, "frank", 502, "frank/site", {"push_id": 2}),
+]
+
+
+def json_record(path) -> dict | None:
+    """First record of a JSON file as a dict, or None when the file is missing."""
+    import pathlib
+    if not pathlib.Path(path).exists():
+        return None
+    cur = duckdb.connect().execute(f"SELECT * FROM read_json('{path}')")
+    return dict(zip([d[0] for d in cur.description], cur.fetchone()))
+
+
+def parquet_count(path) -> int | None:
+    """Row count of a Parquet file, or None when the file is missing."""
+    import pathlib
+    if not pathlib.Path(path).exists():
+        return None
+    return duckdb.connect().execute(f"SELECT count(*) FROM read_parquet('{path}')").fetchone()[0]
+
+
+@functools.lru_cache(maxsize=None)
+def silver_one_result():
+    """Write a synthetic bronze hour to a temp dir, run silver.silver_one on it once, return (record, root)."""
+    import pathlib
+    import backfill
+    import silver
+    root = pathlib.Path(tempfile.mkdtemp(prefix="silver_one_"))
+    src = backfill.bronze_file(str(root / "bronze"), *SILVER_HOUR)
+    pathlib.Path(src).parent.mkdir(parents=True)
+    con = duckdb.connect()
+    con.execute("CREATE TABLE b (id VARCHAR, type VARCHAR, actor STRUCT(id BIGINT, login VARCHAR), "
+                "repo STRUCT(id BIGINT, name VARCHAR), payload JSON, created_at TIMESTAMP, dt VARCHAR, hour INTEGER)")
+    for i, (eid, etype, aid, login, rid, rname, payload) in enumerate(SILVER_EVENTS + SILVER_PUSHES):
+        con.execute("INSERT INTO b VALUES (?, ?, struct_pack(id := CAST(? AS BIGINT), login := CAST(? AS VARCHAR)), "
+                    "struct_pack(id := CAST(? AS BIGINT), name := CAST(? AS VARCHAR)), CAST(? AS JSON), "
+                    "CAST(? AS TIMESTAMP), ?, ?)",
+                    [eid, etype, aid, login, rid, rname, json.dumps(payload), f"2026-09-23 12:00:{i:02d}", *SILVER_HOUR])
+    con.execute(f"COPY b TO '{src}' (FORMAT PARQUET)")
+    rec = silver.silver_one(duckdb.connect(), SILVER_HOUR, bronze_root=str(root / "bronze"),
+                            silver_root=str(root / "silver"), manifest_root=str(root / "manifest"), code_version="test")
+    return rec, root
+
+
+TODO_KEYS = [("2026-09-23", h) for h in range(4)]
+# Bronze: hours 0 and 1 ingested, hour 2 absent upstream, hour 3 never attempted.
+TODO_BRONZE = {TODO_KEYS[0]: "ingested", TODO_KEYS[1]: "ingested", TODO_KEYS[2]: "absent"}
+
 def main() -> int:
     tmp = Path(tempfile.mkdtemp())
     src, dst = tmp / "events.json", tmp / "out.parquet"
@@ -110,6 +193,7 @@ def main() -> int:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ingest"))
     import backfill
     import fetch
+    import silver
 
     results += [
         check("hour_range from parse_hour('2026-09-01T23') to parse_hour('2026-09-02T01') equals [('2026-09-01', 23), ('2026-09-02', 0), ('2026-09-02', 1)]",
@@ -310,6 +394,41 @@ def main() -> int:
         check("hour_range with end before start raises ValueError (checked without the placeholder)", raises(ValueError, lambda: backfill.hour_range(backfill.parse_hour('2026-09-02T01'), backfill.parse_hour('2026-09-01T23'))), True),
         check("incomplete reads retry", C(http.client.IncompleteRead(b"")), backfill.RETRY),
         check("corrupt gzip stream errors retry", C(zlib.error("x")), backfill.RETRY),
+        check("silver pull_requests: duplicates and [bot] actors removed", [r.get("id") for r in silver_rows("pull_requests")], ["1", "2", "3"]),
+        check("silver pull_requests: column order", list((silver_rows("pull_requests") or [{}])[0].keys()), ["id", "created_at", "actor_id", "actor_login", "repo_id", "repo_name", "dt", "hour", "action", "pr_id", "pr_number", "head_repo_id", "base_repo_id", "from_fork"]),
+        check("silver pull_requests: action, pr_id, pr_number", [(r.get("action"), r.get("pr_id"), r.get("pr_number")) for r in silver_rows("pull_requests")], [("opened", 9001, 7), ("merged", 9001, 7), ("opened", 9002, 8)]),
+        check("silver pull_requests: head and base repo ids", [(r.get("head_repo_id"), r.get("base_repo_id")) for r in silver_rows("pull_requests")], [(600, 500), (500, 500), (None, 500)]),
+        check("silver pull_requests: from_fork true, false, NULL when head repo missing", [r.get("from_fork") for r in silver_rows("pull_requests")], [True, False, None]),
+        check("silver issues: action, ids, author and title", [(r.get("id"), r.get("action"), r.get("issue_id"), r.get("issue_number"), r.get("issue_author"), r.get("title")) for r in silver_rows("issues")], [("5", "opened", 7001, 9, "alice", "Crash on start")]),
+        check("silver stars: [bot] stargazer removed", [(r.get("id"), r.get("actor_login"), r.get("repo_name")) for r in silver_rows("stars")], [("6", "dave", "org/proj")]),
+        check("silver reviews: action, pr_number, review_id, state", [(r.get("id"), r.get("action"), r.get("pr_number"), r.get("review_id"), r.get("state")) for r in silver_rows("reviews")], [("7", "created", 7, 8001, "approved")]),
+        check("silver common columns carry dt and hour", [(r.get("dt"), r.get("hour")) for r in silver_rows("stars")], [("2026-09-23", 12)]),
+        check("silver_sql rejects an unknown table", raises(ValueError, lambda: silver.silver_sql("pushes")), True),
+        check("is_stable: a typical hour", silver.is_stable(90000, 70000), True),
+        check("is_stable: no pushes", silver.is_stable(5000, 0), False),
+        check("is_stable: an empty hour", silver.is_stable(0, 0), False),
+        check("is_stable: push share below 0.50", silver.is_stable(80000, 20000), False),
+        check("is_stable: push share above 0.95 with normal non-push volume", silver.is_stable(126000, 120000), False),
+        check("is_stable: non-push volume below a third of the reference", silver.is_stable(8000, 6000), False),
+        check("is_stable: non-push volume above three times the reference", silver.is_stable(300000, 240000), False),
+        check("is_stable: push share of exactly 0.50 passes", silver.is_stable(40000, 20000), True),
+        check("is_stable: push share of exactly 0.95 passes", silver.is_stable(200000, 190000), True),
+        check("is_stable: non-push of exactly REF_NONPUSH / 3 passes", silver.is_stable(22524, 16893), True),
+        check("is_stable: non-push of exactly REF_NONPUSH * 3 passes", silver.is_stable(101358, 50679), True),
+        check("silver_one: marks the hour ingested", silver_one_result()[0].get("status"), "ingested"),
+        check("silver_one: writes a Parquet file for every table", [parquet_count(backfill.bronze_file(str(silver_one_result()[1] / "silver" / t), *SILVER_HOUR)) is not None for t in silver.TABLES], [True, True, True, True]),
+        check("silver_one: rows out per table", [silver_one_result()[0].get(f"{t}_rows") for t in silver.TABLES], [3, 1, 1, 1]),
+        check("silver_one: pull_requests in, bots, duplicates", [silver_one_result()[0].get(f"pull_requests_{k}") for k in ("in", "bots", "dups")], [5, 1, 1]),
+        check("silver_one: stars in, bots, duplicates", [silver_one_result()[0].get(f"stars_{k}") for k in ("in", "bots", "dups")], [2, 1, 0]),
+        check("silver_one: bronze rows, pushes and stable flag", [silver_one_result()[0].get(k) for k in ("bronze_rows", "push", "stable")], [11, 2, False]),
+        check("silver_one: in - bots - dups = rows for every table", all(silver_one_result()[0].get(f"{t}_in", -1) - silver_one_result()[0].get(f"{t}_bots", 0) - silver_one_result()[0].get(f"{t}_dups", 0) == silver_one_result()[0].get(f"{t}_rows") for t in silver.TABLES), True),
+        check("silver_one: marker on disk matches the record", [(json_record(backfill.marker_path(str(silver_one_result()[1] / "manifest"), *SILVER_HOUR)) or {}).get(k) for k in ("status", "pull_requests_rows", "stable")], ["ingested", 3, False]),
+        check("silver_one: the pull_requests file holds the deduplicated rows", parquet_count(backfill.bronze_file(str(silver_one_result()[1] / "silver" / "pull_requests"), *SILVER_HOUR)), 3),
+        check("silver_todo: skips built hours and hours without bronze", silver.silver_todo(TODO_KEYS, {TODO_KEYS[0]: "ingested"}, {TODO_KEYS[0]}, TODO_BRONZE, "resume"), [TODO_KEYS[1]]),
+        check("silver_todo: force rebuilds every hour that has bronze", silver.silver_todo(TODO_KEYS, {TODO_KEYS[0]: "ingested"}, {TODO_KEYS[0]}, TODO_BRONZE, "force"), [TODO_KEYS[0], TODO_KEYS[1]]),
+        check("silver_todo: rebuilds a built hour whose silver data is missing", silver.silver_todo(TODO_KEYS, {TODO_KEYS[0]: "ingested"}, set(), TODO_BRONZE, "resume"), [TODO_KEYS[0], TODO_KEYS[1]]),
+        check("silver_todo: retries a failed hour", silver.silver_todo(TODO_KEYS, {TODO_KEYS[0]: "ingested", TODO_KEYS[1]: "failed"}, {TODO_KEYS[0], TODO_KEYS[1]}, TODO_BRONZE, "resume"), [TODO_KEYS[1]]),
+        check("silver_todo: never builds an hour whose bronze is absent or missing", silver.silver_todo(TODO_KEYS, {}, set(), TODO_BRONZE, "force"), [TODO_KEYS[0], TODO_KEYS[1]]),
     ]
 
     print()

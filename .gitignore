@@ -26,3 +26,5 @@ credentials
 .DS_Store
 .ghpulsevenv/
 .aider*
+!.aider.conf.yml
+!.aider.model.settings.yml
