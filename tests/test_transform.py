@@ -223,6 +223,21 @@ Examples of when to suggest shell commands:
 - Etc.
 
 
+def bad_silver_file(name: str, update: str = "", hour: int = 12) -> str:
+    """Copy the good pull_requests silver file, apply an UPDATE to the copy, write it under `hour`; return its path."""
+    import pathlib
+    import backfill
+    good = backfill.bronze_file(str(silver_one_result()[1] / "silver" / "pull_requests"), *SILVER_HOUR)
+    dest = backfill.bronze_file(str(silver_one_result()[1] / "bad" / name / "pull_requests"), SILVER_HOUR[0], hour)
+    pathlib.Path(dest).parent.mkdir(parents=True, exist_ok=True)
+    con = duckdb.connect()
+    con.execute(f"CREATE TABLE t AS SELECT * FROM read_parquet('{good}')")
+    if update:
+        con.execute(f"UPDATE t SET {update}")
+    con.execute(f"COPY t TO '{dest}' (FORMAT PARQUET)")
+    return dest
+
+
 def main() -> int:
     tmp = Path(tempfile.mkdtemp())
     src, dst = tmp / "events.json", tmp / "out.parquet"
