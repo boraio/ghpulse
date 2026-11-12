@@ -19,3 +19,18 @@ def marker_violations(rec: dict) -> list[str]:
         elif counts[0] - counts[1] - counts[2] != counts[3]:
             out.append(f"{where} {t}: in {counts[0]} - bots {counts[1]} - dups {counts[2]} != rows {counts[3]}")
     return out
+
+
+COMMON_REQUIRED = ("id", "created_at", "actor_id", "actor_login", "repo_id", "repo_name", "dt", "hour")
+# Columns that must never be null, per table; optional ones (from_fork, head_repo_id, issue_author, title) are not gated.
+REQUIRED = {
+    "pull_requests": ("action", "pr_id", "pr_number", "base_repo_id"),
+    "issues": ("action", "issue_id", "issue_number"),
+    "stars": (),
+    "reviews": ("action", "pr_number", "review_id", "state"),
+}
+
+
+def table_violations(con, table: str, files: list[str]) -> list[str]:
+    """Violations across one table's silver files: null required columns, ids repeated anywhere, [bot] actors, rows outside their partition."""
+    return ["stub"] * 3  # stub: wrong on purpose, so every check fails before the implementation
