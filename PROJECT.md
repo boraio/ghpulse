@@ -67,7 +67,8 @@ project demonstrates.
   `/etc/jenga.env`. Never in the repo.
 - **Spark**: `spark-client` against the Kubernetes cluster (not Kyuubi — see
   non-goals)
-- **CI**: GitHub Actions on self-hosted runners in the cluster (ARC)
+- **CI**: GitHub Actions on GitHub-hosted `ubuntu-latest` runners, since the repo
+  became public (2026-11-12); the self-hosted ARC runners in the cluster were used before
 - **Repo**: `boraio/ghpulse`
 
 ## Current state
