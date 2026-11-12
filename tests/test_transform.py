@@ -436,6 +436,13 @@ def main() -> int:
         check("quality: a failed hour is one violation", len(quality.marker_violations({"dt": "2026-09-23", "hour": 12, "status": "failed"})), 1),
         check("quality: missing per-table counts are a violation", [("stars" in v) for v in quality.marker_violations({k: v for k, v in silver_one_result()[0].items() if not k.startswith("stars_")})], [True]),
         check("quality: each table that fails to reconcile is reported", len(quality.marker_violations({**silver_one_result()[0], "issues_rows": 0, "reviews_bots": 5})), 2),
+        check("quality: good silver files pass every table gate", [quality.table_violations(duckdb.connect(), t, [backfill.bronze_file(str(silver_one_result()[1] / "silver" / t), *SILVER_HOUR)]) for t in silver.TABLES], [[], [], [], []]),
+        check("quality: a null id is caught", [("null id" in v) for v in quality.table_violations(duckdb.connect(), "pull_requests", [quality_fixtures.bad_silver_file(silver_one_result()[1], "null_id", "id = NULL WHERE id = '1'")])], [True]),
+        check("quality: a null required column is caught", [("null pr_number" in v) for v in quality.table_violations(duckdb.connect(), "pull_requests", [quality_fixtures.bad_silver_file(silver_one_result()[1], "null_pr_number", "pr_number = NULL WHERE id = '3'")])], [True]),
+        check("quality: a leaked [bot] actor is caught", [("[bot]" in v) for v in quality.table_violations(duckdb.connect(), "pull_requests", [quality_fixtures.bad_silver_file(silver_one_result()[1], "bot", "actor_login = 'leaky[bot]' WHERE id = '2'")])], [True]),
+        check("quality: an id repeated in another hour is caught", [("duplicate" in v) for v in quality.table_violations(duckdb.connect(), "pull_requests", [backfill.bronze_file(str(silver_one_result()[1] / "silver" / "pull_requests"), *SILVER_HOUR), quality_fixtures.bad_silver_file(silver_one_result()[1], "dup_hour13", "hour = 13", 13)])], [True]),
+        check("quality: rows stored under the wrong hour are caught", [("partition" in v) for v in quality.table_violations(duckdb.connect(), "pull_requests", [quality_fixtures.bad_silver_file(silver_one_result()[1], "misplaced", "", 13)])], [True]),
+        check("quality: no files means no violations", quality.table_violations(duckdb.connect(), "stars", []), []),
     ]
 
     print()
