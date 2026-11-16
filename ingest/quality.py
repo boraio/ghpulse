@@ -20,7 +20,8 @@ def path_exists(con, path: str) -> bool:
 
 def load_marker(con, path: str) -> dict:
     """One marker as a dict; hive_partitioning=false, or hour=00 in the path turns the hour into the string '00' (2026-11-16)."""
-    return {}  # stub: load_marker
+    cur = con.execute(f"SELECT * FROM read_json('{path}', hive_partitioning=false)")
+    return dict(zip([c[0] for c in cur.description], cur.fetchone()))
 
 
 def marker_violations(rec: dict) -> list[str]:
