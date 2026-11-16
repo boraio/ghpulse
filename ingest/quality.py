@@ -70,7 +70,7 @@ def main(argv=None) -> int:
         fetch.s3_config(con)
 
     def exists(path: str) -> bool:
-        return con.execute(f"SELECT count(*) FROM glob('{path}')").fetchone()[0] > 0
+        return path_exists(con, path)
 
     violations, built = [], []
     for d, h in keys:
