@@ -446,6 +446,8 @@ def main() -> int:
         check("quality: files matching their marker pass the storage gate", quality.storage_violations(duckdb.connect(), str(silver_one_result()[1] / "silver"), silver_one_result()[0]), []),
         check("quality: a marker count that disagrees with its file is caught", [("pull_requests" in v) for v in quality.storage_violations(duckdb.connect(), str(silver_one_result()[1] / "silver"), {**silver_one_result()[0], "pull_requests_rows": 2})], [True]),
         check("quality: every missing table file is reported", [("missing" in v) for v in quality.storage_violations(duckdb.connect(), str(silver_one_result()[1] / "nowhere"), silver_one_result()[0])], [True, True, True, True]),
+        check("quality CLI: a clean hour exits 0", quality.main(["--start", "2026-09-23T12", "--end", "2026-09-23T12", "--silver-root", str(silver_one_result()[1] / "silver"), "--manifest-root", str(silver_one_result()[1] / "manifest")]), 0),
+        check("quality CLI: an hour with no silver marker exits 1", quality.main(["--start", "2026-09-23T12", "--end", "2026-09-23T13", "--silver-root", str(silver_one_result()[1] / "silver"), "--manifest-root", str(silver_one_result()[1] / "manifest")]), 1),
     ]
 
     print()
