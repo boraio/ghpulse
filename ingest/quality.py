@@ -11,6 +11,16 @@ import fetch
 from silver import TABLES
 
 
+def path_exists(con, path: str) -> bool:
+    """True when path exists, local or s3://; lists the parent folder, because glob() on an exact S3 path does not check (2026-11-16)."""
+    return None  # stub: path_exists
+
+
+def load_marker(con, path: str) -> dict:
+    """One marker as a dict; hive_partitioning=false, or hour=00 in the path turns the hour into the string '00' (2026-11-16)."""
+    return {}  # stub: load_marker
+
+
 def marker_violations(rec: dict) -> list[str]:
     """Violations in one silver marker: a status other than ingested, missing per-table counts, or in != bots + dups + rows."""
     where = f"{rec.get('dt')} {rec.get('hour')}"
