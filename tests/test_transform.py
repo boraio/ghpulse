@@ -448,6 +448,11 @@ def main() -> int:
         check("quality: every missing table file is reported", [("missing" in v) for v in quality.storage_violations(duckdb.connect(), str(silver_one_result()[1] / "nowhere"), silver_one_result()[0])], [True, True, True, True]),
         check("quality CLI: a clean hour exits 0", quality.main(["--start", "2026-09-23T12", "--end", "2026-09-23T12", "--silver-root", str(silver_one_result()[1] / "silver"), "--manifest-root", str(silver_one_result()[1] / "manifest")]), 0),
         check("quality CLI: an hour with no silver marker exits 1", quality.main(["--start", "2026-09-23T12", "--end", "2026-09-23T13", "--silver-root", str(silver_one_result()[1] / "silver"), "--manifest-root", str(silver_one_result()[1] / "manifest")]), 1),
+        check("path_exists: an existing file", quality.path_exists(duckdb.connect(), quality_fixtures.marker_at(silver_one_result()[1], 5)), True),
+        check("path_exists: a missing file in an existing folder", quality.path_exists(duckdb.connect(), quality_fixtures.marker_at(silver_one_result()[1], 5).replace("status.json", "other.json")), False),
+        check("path_exists: a file in a missing folder", quality.path_exists(duckdb.connect(), str(silver_one_result()[1] / "nowhere" / "status.json")), False),
+        check("load_marker: hour=05 in the path still reads as the integer 5", (lambda m: (m.get("hour"), type(m.get("hour")).__name__))(quality.load_marker(duckdb.connect(), quality_fixtures.marker_at(silver_one_result()[1], 5))), (5, "int")),
+        check("load_marker: dt and status come back as stored", [quality.load_marker(duckdb.connect(), quality_fixtures.marker_at(silver_one_result()[1], 5)).get(k) for k in ("dt", "status")], ["2026-09-23", "ingested"]),
     ]
 
     print()
