@@ -443,6 +443,9 @@ def main() -> int:
         check("quality: an id repeated in another hour is caught", [("duplicate" in v) for v in quality.table_violations(duckdb.connect(), "pull_requests", [backfill.bronze_file(str(silver_one_result()[1] / "silver" / "pull_requests"), *SILVER_HOUR), quality_fixtures.bad_silver_file(silver_one_result()[1], "dup_hour13", "hour = 13", 13)])], [True]),
         check("quality: rows stored under the wrong hour are caught", [("partition" in v) for v in quality.table_violations(duckdb.connect(), "pull_requests", [quality_fixtures.bad_silver_file(silver_one_result()[1], "misplaced", "", 13)])], [True]),
         check("quality: no files means no violations", quality.table_violations(duckdb.connect(), "stars", []), []),
+        check("quality: files matching their marker pass the storage gate", quality.storage_violations(duckdb.connect(), str(silver_one_result()[1] / "silver"), silver_one_result()[0]), []),
+        check("quality: a marker count that disagrees with its file is caught", [("pull_requests" in v) for v in quality.storage_violations(duckdb.connect(), str(silver_one_result()[1] / "silver"), {**silver_one_result()[0], "pull_requests_rows": 2})], [True]),
+        check("quality: every missing table file is reported", [("missing" in v) for v in quality.storage_violations(duckdb.connect(), str(silver_one_result()[1] / "nowhere"), silver_one_result()[0])], [True, True, True, True]),
     ]
 
     print()
