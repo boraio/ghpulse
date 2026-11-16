@@ -78,8 +78,7 @@ def main(argv=None) -> int:
         if not exists(marker):
             violations.append(f"{d} {h:02d}: no silver marker")
             continue
-        cur = con.execute(f"SELECT * FROM read_json('{marker}')")
-        rec = dict(zip([c[0] for c in cur.description], cur.fetchone()))
+        rec = load_marker(con, marker)
         violations += marker_violations(rec)
         if rec.get("status") == backfill.INGESTED:
             violations += storage_violations(con, args.silver_root, rec)
