@@ -453,6 +453,7 @@ def main() -> int:
         check("path_exists: a file in a missing folder", quality.path_exists(duckdb.connect(), str(silver_one_result()[1] / "nowhere" / "status.json")), False),
         check("load_marker: hour=05 in the path still reads as the integer 5", (lambda m: (m.get("hour"), type(m.get("hour")).__name__))(quality.load_marker(duckdb.connect(), quality_fixtures.marker_at(silver_one_result()[1], 5))), (5, "int")),
         check("load_marker: dt and status come back as stored", [quality.load_marker(duckdb.connect(), quality_fixtures.marker_at(silver_one_result()[1], 5)).get(k) for k in ("dt", "status")], ["2026-09-23", "ingested"]),
+        check("quality.py run as a script exits 0 on a clean hour", quality_fixtures.run_quality_script("--start", "2026-09-23T12", "--end", "2026-09-23T12", "--silver-root", str(silver_one_result()[1] / "silver"), "--manifest-root", str(silver_one_result()[1] / "manifest")), 0),
     ]
 
     print()
