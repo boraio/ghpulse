@@ -23,7 +23,18 @@ def marker_violations(rec: dict) -> list[str]:
 
 def storage_violations(con, silver_root: str, rec: dict) -> list[str]:
     """Violations between one silver marker and its files: a table file missing, or holding a different row count."""
-    return ["stub"] * 3  # stub: wrong on purpose, so every check fails before the implementation
+    where = f"{rec.get('dt')} {rec.get('hour')}"
+    out = []
+    for t in TABLES:
+        path = backfill.bronze_file(f"{silver_root}/{t}", rec["dt"], rec["hour"])
+        # A missing file is a finding to report, not an error to raise, so look before reading.
+        if con.execute(f"SELECT count(*) FROM glob('{path}')").fetchone()[0] == 0:
+            out.append(f"{where} {t}: file missing ({path})")
+            continue
+        n = con.execute(f"SELECT count(*) FROM read_parquet('{path}')").fetchone()[0]
+        if n != rec.get(f"{t}_rows"):
+            out.append(f"{where} {t}: marker says {rec.get(f'{t}_rows')} rows, file holds {n}")
+    return out
 
 
 COMMON_REQUIRED = ("id", "created_at", "actor_id", "actor_login", "repo_id", "repo_name", "dt", "hour")
