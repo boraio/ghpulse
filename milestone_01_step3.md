@@ -2,8 +2,8 @@
 
 Status as of 2026-11-10: **runner complete and verified live** (`silver_one`, `silver_todo`, CLI).
 Branch `silver` (history rewritten and force-pushed 2026-11-10), 113 PASS, ruff clean.
-**Silver built for Sep 22–28 and reconciled with bronze** (2026-11-12). Next: sync the
-repo docs, PR and squash-merge, then step 4.
+**Silver built for Sep 22–28 and reconciled with bronze** (2026-11-12). **Merged to `main`
+as `fe969ca`** (PR, squash), CI green on GitHub-hosted runners. Step 3 is done.
 
 Done: `ingest/silver.py` with `silver_sql(table)` for the four tables, driven by
 10 offline checks written first and seen failing against a stub (suite at 88
