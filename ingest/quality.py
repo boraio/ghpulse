@@ -93,8 +93,6 @@ def main(argv=None) -> int:
     return 1 if violations else 0
 
 
-if __name__ == "__main__":
-    sys.exit(main())
 
 
 COMMON_REQUIRED = ("id", "created_at", "actor_id", "actor_login", "repo_id", "repo_name", "dt", "hour")
