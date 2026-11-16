@@ -44,7 +44,41 @@ def storage_violations(con, silver_root: str, rec: dict) -> list[str]:
 
 def main(argv=None) -> int:
     """Run the silver quality gates over an inclusive range of UTC hours; exit 1 on any violation."""
-    return 2  # stub: wrong on purpose, so every check fails before the implementation
+    p = argparse.ArgumentParser(description=main.__doc__)
+    p.add_argument("--start", required=True, help="first hour, e.g. 2026-09-22T00 (UTC)")
+    p.add_argument("--end", required=True, help="last hour, inclusive")
+    p.add_argument("--silver-root", default="s3://ghpulse/silver")
+    p.add_argument("--manifest-root", default="s3://ghpulse/_manifest/silver")
+    args = p.parse_args(argv)
+    keys = backfill.hour_range(backfill.parse_hour(args.start), backfill.parse_hour(args.end))
+    con = duckdb.connect()
+    con.execute("SET enable_progress_bar=false")
+    if args.silver_root.startswith("s3://") or args.manifest_root.startswith("s3://"):
+        fetch.s3_config(con)
+
+    def exists(path: str) -> bool:
+        return con.execute(f"SELECT count(*) FROM glob('{path}')").fetchone()[0] > 0
+
+    violations, built = [], []
+    for d, h in keys:
+        marker = backfill.marker_path(args.manifest_root, d, h)
+        if not exists(marker):
+            violations.append(f"{d} {h:02d}: no silver marker")
+            continue
+        cur = con.execute(f"SELECT * FROM read_json('{marker}')")
+        rec = dict(zip([c[0] for c in cur.description], cur.fetchone()))
+        violations += marker_violations(rec)
+        if rec.get("status") == backfill.INGESTED:
+            violations += storage_violations(con, args.silver_root, rec)
+            built.append((d, h))
+    for t in TABLES:
+        files = [backfill.bronze_file(f"{args.silver_root}/{t}", d, h) for d, h in built]
+        # Missing files were already reported by the storage gate; the table gate reads only what exists.
+        violations += table_violations(con, t, [f for f in files if exists(f)])
+    for v in violations:
+        print(v)
+    print(f"checked {len(keys)} hours, {len(built)} built: {len(violations)} violations")
+    return 1 if violations else 0
 
 
 if __name__ == "__main__":
