@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import argparse
+import sys
+
 import backfill
+import duckdb
+import fetch
 from silver import TABLES
 
 
