@@ -22,3 +22,10 @@ def bad_silver_file(root, name: str, update: str = "", hour: int = 12) -> str:
         con.execute(f"UPDATE t SET {update}")
     con.execute(f"COPY t TO '{dest}' (FORMAT PARQUET)")
     return dest
+
+
+def marker_at(root, hour: int) -> str:
+    """Write a minimal silver marker under hour=`hour` (zero-padded in the path) beneath root; return its path."""
+    path = backfill.marker_path(str(pathlib.Path(root) / "markers"), DT, hour)
+    backfill.write_marker(duckdb.connect(), path, {"dt": DT, "hour": hour, "status": "ingested"})
+    return path
