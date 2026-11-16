@@ -13,7 +13,9 @@ from silver import TABLES
 
 def path_exists(con, path: str) -> bool:
     """True when path exists, local or s3://; lists the parent folder, because glob() on an exact S3 path does not check (2026-11-16)."""
-    return None  # stub: path_exists
+    parent = path.rsplit("/", 1)[0]
+    rows = con.execute(f"SELECT file FROM glob('{parent}/*')").fetchall()
+    return any(f == path for (f,) in rows)
 
 
 def load_marker(con, path: str) -> dict:
