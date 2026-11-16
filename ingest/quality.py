@@ -42,6 +42,15 @@ def storage_violations(con, silver_root: str, rec: dict) -> list[str]:
     return out
 
 
+def main(argv=None) -> int:
+    """Run the silver quality gates over an inclusive range of UTC hours; exit 1 on any violation."""
+    return 2  # stub: wrong on purpose, so every check fails before the implementation
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+
+
 COMMON_REQUIRED = ("id", "created_at", "actor_id", "actor_login", "repo_id", "repo_name", "dt", "hour")
 # Columns that must never be null, per table; optional ones (from_fork, head_repo_id, issue_author, title) are not gated.
 REQUIRED = {
