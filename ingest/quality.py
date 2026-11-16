@@ -39,10 +39,6 @@ def marker_violations(rec: dict) -> list[str]:
     return out
 
 
-if __name__ == "__main__":
-    sys.exit(main())
-
-
 def storage_violations(con, silver_root: str, rec: dict) -> list[str]:
     """Violations between one silver marker and its files: a table file missing, or holding a different row count."""
     where = f"{rec.get('dt')} {rec.get('hour')}"
@@ -136,3 +132,7 @@ def table_violations(con, table: str, files: list[str]) -> list[str]:
 
 
     return out
+
+
+if __name__ == "__main__":
+    sys.exit(main())
