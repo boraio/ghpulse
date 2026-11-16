@@ -46,7 +46,7 @@ def storage_violations(con, silver_root: str, rec: dict) -> list[str]:
     for t in TABLES:
         path = backfill.bronze_file(f"{silver_root}/{t}", rec["dt"], rec["hour"])
         # A missing file is a finding to report, not an error to raise, so look before reading.
-        if con.execute(f"SELECT count(*) FROM glob('{path}')").fetchone()[0] == 0:
+        if not path_exists(con, path):
             out.append(f"{where} {t}: file missing ({path})")
             continue
         n = con.execute(f"SELECT count(*) FROM read_parquet('{path}')").fetchone()[0]
