@@ -193,3 +193,7 @@ a positive one with a leaky split.
   0 failed; bronze in = `[bot]` + duplicates + silver rows for every hour and
   table; no duplicate id across the week; `[bot]` share 35.5% of PR events,
   35.2% of reviews, 16.1% of issues, 0% of stars.
+- **Step 4 (data-quality gates) built and verified** (2026-11-16): marker,
+  storage and table gates in `ingest/quality.py`, checked offline in CI (136
+  PASS) and live over Sep 22–28 with 0 violations; a deliberate gap is reported
+  and exits 1. Details in `milestone_01_step4.md`.

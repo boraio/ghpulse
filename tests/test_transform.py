@@ -193,6 +193,8 @@ def main() -> int:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ingest"))
     import backfill
     import fetch
+    import quality_fixtures
+    import quality
     import silver
 
     results += [
@@ -429,6 +431,29 @@ def main() -> int:
         check("silver_todo: rebuilds a built hour whose silver data is missing", silver.silver_todo(TODO_KEYS, {TODO_KEYS[0]: "ingested"}, set(), TODO_BRONZE, "resume"), [TODO_KEYS[0], TODO_KEYS[1]]),
         check("silver_todo: retries a failed hour", silver.silver_todo(TODO_KEYS, {TODO_KEYS[0]: "ingested", TODO_KEYS[1]: "failed"}, {TODO_KEYS[0], TODO_KEYS[1]}, TODO_BRONZE, "resume"), [TODO_KEYS[1]]),
         check("silver_todo: never builds an hour whose bronze is absent or missing", silver.silver_todo(TODO_KEYS, {}, set(), TODO_BRONZE, "force"), [TODO_KEYS[0], TODO_KEYS[1]]),
+        check("quality: a good silver marker has no violations", quality.marker_violations(silver_one_result()[0]), []),
+        check("quality: a marker count off by one is caught", [("pull_requests" in v) for v in quality.marker_violations({**silver_one_result()[0], "pull_requests_rows": 2})], [True]),
+        check("quality: a failed hour is one violation", len(quality.marker_violations({"dt": "2026-09-23", "hour": 12, "status": "failed"})), 1),
+        check("quality: missing per-table counts are a violation", [("stars" in v) for v in quality.marker_violations({k: v for k, v in silver_one_result()[0].items() if not k.startswith("stars_")})], [True]),
+        check("quality: each table that fails to reconcile is reported", len(quality.marker_violations({**silver_one_result()[0], "issues_rows": 0, "reviews_bots": 5})), 2),
+        check("quality: good silver files pass every table gate", [quality.table_violations(duckdb.connect(), t, [backfill.bronze_file(str(silver_one_result()[1] / "silver" / t), *SILVER_HOUR)]) for t in silver.TABLES], [[], [], [], []]),
+        check("quality: a null id is caught", [("null id" in v) for v in quality.table_violations(duckdb.connect(), "pull_requests", [quality_fixtures.bad_silver_file(silver_one_result()[1], "null_id", "id = NULL WHERE id = '1'")])], [True]),
+        check("quality: a null required column is caught", [("null pr_number" in v) for v in quality.table_violations(duckdb.connect(), "pull_requests", [quality_fixtures.bad_silver_file(silver_one_result()[1], "null_pr_number", "pr_number = NULL WHERE id = '3'")])], [True]),
+        check("quality: a leaked [bot] actor is caught", [("[bot]" in v) for v in quality.table_violations(duckdb.connect(), "pull_requests", [quality_fixtures.bad_silver_file(silver_one_result()[1], "bot", "actor_login = 'leaky[bot]' WHERE id = '2'")])], [True]),
+        check("quality: an id repeated in another hour is caught", [("duplicate" in v) for v in quality.table_violations(duckdb.connect(), "pull_requests", [backfill.bronze_file(str(silver_one_result()[1] / "silver" / "pull_requests"), *SILVER_HOUR), quality_fixtures.bad_silver_file(silver_one_result()[1], "dup_hour13", "hour = 13", 13)])], [True]),
+        check("quality: rows stored under the wrong hour are caught", [("partition" in v) for v in quality.table_violations(duckdb.connect(), "pull_requests", [quality_fixtures.bad_silver_file(silver_one_result()[1], "misplaced", "", 13)])], [True]),
+        check("quality: no files means no violations", quality.table_violations(duckdb.connect(), "stars", []), []),
+        check("quality: files matching their marker pass the storage gate", quality.storage_violations(duckdb.connect(), str(silver_one_result()[1] / "silver"), silver_one_result()[0]), []),
+        check("quality: a marker count that disagrees with its file is caught", [("pull_requests" in v) for v in quality.storage_violations(duckdb.connect(), str(silver_one_result()[1] / "silver"), {**silver_one_result()[0], "pull_requests_rows": 2})], [True]),
+        check("quality: every missing table file is reported", [("missing" in v) for v in quality.storage_violations(duckdb.connect(), str(silver_one_result()[1] / "nowhere"), silver_one_result()[0])], [True, True, True, True]),
+        check("quality CLI: a clean hour exits 0", quality.main(["--start", "2026-09-23T12", "--end", "2026-09-23T12", "--silver-root", str(silver_one_result()[1] / "silver"), "--manifest-root", str(silver_one_result()[1] / "manifest")]), 0),
+        check("quality CLI: an hour with no silver marker exits 1", quality.main(["--start", "2026-09-23T12", "--end", "2026-09-23T13", "--silver-root", str(silver_one_result()[1] / "silver"), "--manifest-root", str(silver_one_result()[1] / "manifest")]), 1),
+        check("path_exists: an existing file", quality.path_exists(duckdb.connect(), quality_fixtures.marker_at(silver_one_result()[1], 5)), True),
+        check("path_exists: a missing file in an existing folder", quality.path_exists(duckdb.connect(), quality_fixtures.marker_at(silver_one_result()[1], 5).replace("status.json", "other.json")), False),
+        check("path_exists: a file in a missing folder", quality.path_exists(duckdb.connect(), str(silver_one_result()[1] / "nowhere" / "status.json")), False),
+        check("load_marker: hour=05 in the path still reads as the integer 5", (lambda m: (m.get("hour"), type(m.get("hour")).__name__))(quality.load_marker(duckdb.connect(), quality_fixtures.marker_at(silver_one_result()[1], 5))), (5, "int")),
+        check("load_marker: dt and status come back as stored", [quality.load_marker(duckdb.connect(), quality_fixtures.marker_at(silver_one_result()[1], 5)).get(k) for k in ("dt", "status")], ["2026-09-23", "ingested"]),
+        check("quality.py run as a script exits 0 on a clean hour", quality_fixtures.run_quality_script("--start", "2026-09-23T12", "--end", "2026-09-23T12", "--silver-root", str(silver_one_result()[1] / "silver"), "--manifest-root", str(silver_one_result()[1] / "manifest")), 0),
     ]
 
     print()

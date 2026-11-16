@@ -119,9 +119,11 @@ Done and verified offline:
   lint with the pinned version, `compileall`, and the offline checks, so the
   checks are verified on a clean runner, not only locally.
 
-**Step 3 (silver, DuckDB) is in progress** on branch `silver`: `silver_sql` and
-`is_stable` built test-first, 99 PASS; the per-hour runner is next (see
-**`milestone_01_step3.md`**). The recommender proceeds on GH Archive's
+**Step 3 (silver, DuckDB) is done** and merged as `fe969ca` (2026-11-12): four silver
+tables for Sep 22–28, reconciled hour by hour against bronze, 113 PASS. Step 4
+(data-quality gates) is built on branch `quality` and passes live over Sep 22–28,
+136 PASS (see
+**`milestone_01_step3.md`** and **`milestone_01_step4.md`**). The recommender proceeds on GH Archive's
 ~2% sample (decided 2026-10-23).
 
 Next: silver transforms in DuckDB (step 3), developed on Sep 22–28; the
@@ -310,6 +312,28 @@ wrong in milestone 1 step 0.
   With `tests/test_transform.py` this long, opening it beside another file plus
   the repo map overran the context. Open only the file a prompt edits, and
   start aider with `--map-tokens 0` for pure insertions.
+- **The model can write aider's own system prompt into a file** (2026-11-12, step
+  4). Asked to insert a 15-line helper into the 443-line test file, it inserted
+  ~55 lines of aider's instructions ("Only create *SEARCH/REPLACE* blocks…")
+  plus the helper, then a retry commit added the helper again. Lint caught it;
+  the file was restored from the last good commit with `git checkout <good> --
+  <file>` and a new commit, no history rewrite. New test helpers now go in small
+  separate modules (e.g. `tests/quality_fixtures.py`) so the test file only
+  receives one-line checks. After any large insertion, grep the file for
+  `SEARCH/REPLACE`.
+- **An anchor that is not unique lands at its first match.** In step 4 an
+  insertion anchored on "the last two lines of table_violations" (an `append`
+  line, then `return out`) was applied after the first `return out` in the file,
+  because a blank line sat between those two lines in the real file. The
+  storage gate and then `main` and its `__main__` guard landed above
+  `table_violations`. Imports still saw every function, so the suite stayed
+  green, while `python ingest/quality.py` failed with a `NameError`. Rules: check
+  an anchor with `grep -n -A2` before using it; for "append at the end of the
+  file", quote the file's actual last lines; and keep an offline check that runs
+  each CLI module as a script, not only as an import.
+- **Take the red checkpoint before sending the implementation prompt.** A
+  checkpoint taken after it shows green or mixed counts and proves nothing about
+  the checks failing first.
 - **aider's config is tracked and attribution is off** (2026-11-10).
   `.aider.conf.yml` and `.aider.model.settings.yml` were hidden by the `.aider*`
   ignore rule, so a fresh clone would have lost the 0.0 temperature; `.gitignore`
