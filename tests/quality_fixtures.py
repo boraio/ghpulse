@@ -37,3 +37,11 @@ def run_quality_script(*args: str) -> int:
     import sys
     script = pathlib.Path(__file__).resolve().parent.parent / "ingest" / "quality.py"
     return subprocess.run([sys.executable, str(script), *args], capture_output=True).returncode
+
+
+def run_quality_script(*args: str) -> int:
+    """Run ingest/quality.py as a script, not an import, and return its exit code; catches code placed after the __main__ guard."""
+    import subprocess
+    import sys
+    script = pathlib.Path(__file__).resolve().parent.parent / "ingest" / "quality.py"
+    return subprocess.run([sys.executable, str(script), *args], capture_output=True).returncode
