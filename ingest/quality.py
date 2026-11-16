@@ -21,6 +21,11 @@ def marker_violations(rec: dict) -> list[str]:
     return out
 
 
+def storage_violations(con, silver_root: str, rec: dict) -> list[str]:
+    """Violations between one silver marker and its files: a table file missing, or holding a different row count."""
+    return ["stub"] * 3  # stub: wrong on purpose, so every check fails before the implementation
+
+
 COMMON_REQUIRED = ("id", "created_at", "actor_id", "actor_login", "repo_id", "repo_name", "dt", "hour")
 # Columns that must never be null, per table; optional ones (from_fork, head_repo_id, issue_author, title) are not gated.
 REQUIRED = {
@@ -54,4 +59,5 @@ def table_violations(con, table: str, files: list[str]) -> list[str]:
     ).fetchone()[0]
     if misplaced:
         out.append(f"{table}: {misplaced} rows whose dt/hour do not match their partition path")
+    
     return out
