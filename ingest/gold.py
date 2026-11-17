@@ -23,3 +23,13 @@ def events_sql() -> str:
         for table, cond, kind in KINDS
     ]
     return " UNION ALL ".join(parts)
+
+
+def train_sql(events: str = "interaction_events") -> str:
+    """(actor, repo) pairs from events before CUTOFF only: summed weight, event count, first and last seen."""
+    return "SELECT 1 AS x"  # stub: train_sql
+
+
+def test_targets_sql(events: str = "interaction_events") -> str:
+    """(actor, repo) pairs first seen at or after CUTOFF, for actors with at least one event before it."""
+    return "SELECT 1 AS x"  # stub: test_targets_sql
