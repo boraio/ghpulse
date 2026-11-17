@@ -2,6 +2,15 @@
 
 from __future__ import annotations
 
+import argparse
+import os
+import sys
+
+import backfill
+import duckdb
+import fetch
+import silver
+
 # Interaction weights: assumptions, not measurements (milestone_01_step6.md). The most-popular baseline ignores them.
 WEIGHTS = {"star": 1, "issue_opened": 2, "pr_opened": 3, "review": 3, "merge": 4}
 # (silver table, condition, kind). A merge's actor is whoever merged, so `merge` records maintaining a repo.
