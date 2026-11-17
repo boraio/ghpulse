@@ -456,6 +456,10 @@ def main() -> int:
         check("load_marker: hour=05 in the path still reads as the integer 5", (lambda m: (m.get("hour"), type(m.get("hour")).__name__))(quality.load_marker(duckdb.connect(), quality_fixtures.marker_at(silver_one_result()[1], 5))), (5, "int")),
         check("load_marker: dt and status come back as stored", [quality.load_marker(duckdb.connect(), quality_fixtures.marker_at(silver_one_result()[1], 5)).get(k) for k in ("dt", "status")], ["2026-09-23", "ingested"]),
         check("quality.py run as a script exits 0 on a clean hour", quality_fixtures.run_quality_script("--start", "2026-09-23T12", "--end", "2026-09-23T12", "--silver-root", str(silver_one_result()[1] / "silver"), "--manifest-root", str(silver_one_result()[1] / "manifest")), 0),
+        check("gold events: one row per qualifying event", gold_fixtures.rows(f"SELECT actor_login, repo_name, kind FROM ({gold.events_sql()})"), [("alice", "org/a", "pr_opened"), ("alice", "org/a", "star"), ("alice", "org/b", "issue_opened"), ("bob", "org/a", "merge"), ("bob", "org/c", "review"), ("erin", "org/b", "issue_opened")]),
+        check("gold events: own repos, unstable hours and housekeeping are excluded", gold_fixtures.rows(f"SELECT count(*) FROM ({gold.events_sql()}) WHERE actor_login IN ('carol', 'dave', 'frank') OR repo_name = 'alice/x'"), [(0,)]),
+        check("gold events: weights per kind", gold_fixtures.rows(f"SELECT DISTINCT kind, weight FROM ({gold.events_sql()})"), [("issue_opened", 2), ("merge", 4), ("pr_opened", 3), ("review", 3), ("star", 1)]),
+        check("gold events: columns", gold_fixtures.columns(gold.events_sql()), ["actor_id", "actor_login", "repo_id", "repo_name", "kind", "weight", "created_at", "dt", "hour"]),
     ]
 
     print()
