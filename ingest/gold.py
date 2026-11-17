@@ -44,3 +44,8 @@ def test_targets_sql(events: str = "interaction_events") -> str:
         f"HAVING min(created_at) >= TIMESTAMP '{CUTOFF}' "
         f"AND actor_id IN (SELECT actor_id FROM {events} WHERE created_at < TIMESTAMP '{CUTOFF}')"
     )
+
+
+    def repo_funnel_sql(events: str = "interaction_events") -> str:
+        """Per repo, distinct outside actors at each stage: stargazers, issue openers, PR openers, reviewers, mergers."""
+        return "SELECT 1 AS x"  # stub: repo_funnel_sql
