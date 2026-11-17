@@ -29,7 +29,11 @@ def events_sql() -> str:
 
 def train_sql(events: str = "interaction_events") -> str:
     """(actor, repo) pairs from events before CUTOFF only: summed weight, event count, first and last seen."""
-    return "SELECT 1 AS x"  # stub: train_sql
+    return (
+        "SELECT actor_id, any_value(actor_login) AS actor_login, repo_id, any_value(repo_name) AS repo_name, "
+        "sum(weight) AS weight, count(*) AS n_events, min(created_at) AS first_seen, max(created_at) AS last_seen "
+        f"FROM {events} WHERE created_at < TIMESTAMP '{CUTOFF}' GROUP BY actor_id, repo_id"
+    )
 
 
 def test_targets_sql(events: str = "interaction_events") -> str:
