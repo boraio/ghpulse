@@ -50,7 +50,42 @@ WINDOW = ("2026-09-06T00", "2026-10-05T23")
 
 def main(argv=None) -> int:
     """Build the gold tables for a range of hours from silver and its markers, write them under --gold-root, print counts."""
-    return 2  # stub: main
+    p = argparse.ArgumentParser(description=main.__doc__)
+    p.add_argument("--start", default=WINDOW[0], help="first hour (UTC), default: start of the fixed window")
+    p.add_argument("--end", default=WINDOW[1], help="last hour, inclusive, default: end of the fixed window")
+    p.add_argument("--silver-root", default="s3://ghpulse/silver")
+    p.add_argument("--manifest-root", default="s3://ghpulse/_manifest/silver")
+    p.add_argument("--gold-root", default="s3://ghpulse/gold")
+    args = p.parse_args(argv)
+    keys = backfill.hour_range(backfill.parse_hour(args.start), backfill.parse_hour(args.end))
+    days = sorted({d for d, _ in keys})
+    con = duckdb.connect()
+    con.execute("SET enable_progress_bar=false")
+    if any(r.startswith("s3://") for r in (args.silver_root, args.manifest_root, args.gold_root)):
+        fetch.s3_config(con)
+    con.execute("CREATE TABLE keys (dt VARCHAR, hour INTEGER)")
+    con.executemany("INSERT INTO keys VALUES (?, ?)", keys)
+    # dt is read as text so it joins silver's dt; only hours inside [start, end] survive the semi-join.
+    marker_files = [f"{args.manifest_root}/dt={d}/hour=*/status.json" for d in days]
+    con.execute(
+        f"CREATE TABLE markers AS SELECT dt, hour, stable FROM read_json({marker_files}, "
+        "columns={'dt': 'VARCHAR', 'hour': 'INTEGER', 'stable': 'BOOLEAN'}, hive_partitioning=false) "
+        "SEMI JOIN keys USING (dt, hour)"
+    )
+    for t in silver.TABLES:
+        files = [f"{args.silver_root}/{t}/dt={d}/hour=*/data.parquet" for d in days]
+        con.execute(f"CREATE TABLE {t} AS SELECT * FROM read_parquet({files}, hive_partitioning=false)")
+    con.execute(f"CREATE TABLE interaction_events AS {events_sql()}")
+    outputs = {"interaction_events": "SELECT * FROM interaction_events", "interactions_train": train_sql(),
+               "test_targets": test_targets_sql(), "repo_funnel": repo_funnel_sql()}
+    for name, sql in outputs.items():
+        path = f"{args.gold_root}/{name}/data.parquet"
+        if not path.startswith("s3://"):
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+        con.execute(f"COPY ({sql}) TO '{path}' (FORMAT PARQUET)")
+        n = con.execute(f"SELECT count(*) FROM ({sql})").fetchone()[0]
+        print(f"{name}: {n:,} rows -> {path}")
+    return 0
 
 
 if __name__ == "__main__":
