@@ -44,6 +44,18 @@ def train_sql(events: str = "interaction_events") -> str:
         f"FROM {events} WHERE created_at < TIMESTAMP '{CUTOFF}' GROUP BY actor_id, repo_id"
     )
 
+# The fixed window (milestone_01_measurements.md, decided 2026-11-17).
+WINDOW = ("2026-09-06T00", "2026-10-05T23")
+
+
+def main(argv=None) -> int:
+    """Build the gold tables for a range of hours from silver and its markers, write them under --gold-root, print counts."""
+    return 2  # stub: main
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+
 
 def test_targets_sql(events: str = "interaction_events") -> str:
     """(actor, repo) pairs first seen at or after CUTOFF, for actors with at least one event before it."""
