@@ -88,10 +88,6 @@ def main(argv=None) -> int:
     return 0
 
 
-if __name__ == "__main__":
-    sys.exit(main())
-
-
 def test_targets_sql(events: str = "interaction_events") -> str:
     """(actor, repo) pairs first seen at or after CUTOFF, for actors with at least one event before it."""
     return (
@@ -113,3 +109,7 @@ def repo_funnel_sql(events: str = "interaction_events") -> str:
         f"SELECT repo_id, any_value(repo_name) AS repo_name, {stages}, count(DISTINCT actor_id) AS actors "
         f"FROM {events} GROUP BY repo_id"
     )
+
+
+if __name__ == "__main__":
+    sys.exit(main())
