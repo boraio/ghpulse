@@ -460,6 +460,10 @@ def main() -> int:
         check("gold events: own repos, unstable hours and housekeeping are excluded", gold_fixtures.rows(f"SELECT count(*) FROM ({gold.events_sql()}) WHERE actor_login IN ('carol', 'dave', 'frank') OR repo_name = 'alice/x'"), [(0,)]),
         check("gold events: weights per kind", gold_fixtures.rows(f"SELECT DISTINCT kind, weight FROM ({gold.events_sql()})"), [("issue_opened", 2), ("merge", 4), ("pr_opened", 3), ("review", 3), ("star", 1)]),
         check("gold events: columns", gold_fixtures.columns(gold.events_sql()), ["actor_id", "actor_login", "repo_id", "repo_name", "kind", "weight", "created_at", "dt", "hour"]),
+        check("gold train: pairs, summed weights and counts from before the cutoff", gold_fixtures.rows(f"SELECT actor_login, repo_name, weight, n_events FROM ({gold.train_sql(f'({gold.events_sql()})')})"), [("alice", "org/a", 3, 1), ("bob", "org/a", 4, 1), ("bob", "org/c", 3, 1)]),
+        check("gold train: nothing from the test week leaks in", gold_fixtures.rows(f"SELECT count(*) FROM ({gold.train_sql(f'({gold.events_sql()})')}) WHERE last_seen >= TIMESTAMP '2026-09-29'"), [(0,)]),
+        check("gold test targets: new repos in the test week, only for actors with training history", gold_fixtures.rows(f"SELECT actor_login, repo_name FROM ({gold.test_targets_sql(f'({gold.events_sql()})')})"), [("alice", "org/b")]),
+        check("gold cutoff is the start of the test week", getattr(gold, "CUTOFF", None), "2026-09-29 00:00:00"),
     ]
 
     print()
