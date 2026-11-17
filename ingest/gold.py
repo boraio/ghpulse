@@ -17,4 +17,10 @@ KINDS = (
 
 def events_sql() -> str:
     """SELECT of qualifying interaction events over relations pull_requests, issues, stars, reviews and markers (dt, hour, stable)."""
-    return "SELECT 1 AS x"  # stub: wrong on purpose, so every check fails before the implementation
+    parts = [
+        f"SELECT s.actor_id, s.actor_login, s.repo_id, s.repo_name, '{kind}' AS kind, {WEIGHTS[kind]} AS weight, "
+        f"s.created_at, s.dt, s.hour FROM {table} s JOIN markers m ON s.dt = m.dt AND s.hour = m.hour "
+        f"WHERE m.stable AND {cond} AND lower(s.actor_login) <> lower(split_part(s.repo_name, '/', 1))"
+        for table, cond, kind in KINDS
+    ]
+    return " UNION ALL ".join(parts)
