@@ -464,6 +464,8 @@ def main() -> int:
         check("gold train: nothing from the test week leaks in", gold_fixtures.rows(f"SELECT count(*) FROM ({gold.train_sql(f'({gold.events_sql()})')}) WHERE last_seen >= TIMESTAMP '2026-09-29'"), [(0,)]),
         check("gold test targets: new repos in the test week, only for actors with training history", gold_fixtures.rows(f"SELECT actor_login, repo_name FROM ({gold.test_targets_sql(f'({gold.events_sql()})')})"), [("alice", "org/b")]),
         check("gold cutoff is the start of the test week", getattr(gold, "CUTOFF", None), "2026-09-29 00:00:00"),
+        check("gold repo funnel: distinct outside actors per stage", gold_fixtures.rows(f"SELECT repo_name, stargazers, issue_openers, pr_openers, reviewers, mergers, actors FROM ({gold.repo_funnel_sql(f'({gold.events_sql()})')})"), [("org/a", 1, 0, 1, 0, 1, 2), ("org/b", 0, 2, 0, 0, 0, 2), ("org/c", 0, 0, 0, 1, 0, 1)]),
+        check("gold repo funnel: columns", gold_fixtures.columns(gold.repo_funnel_sql(f"({gold.events_sql()})")), ["repo_id", "repo_name", "stargazers", "issue_openers", "pr_openers", "reviewers", "mergers", "actors"]),
     ]
 
     print()
