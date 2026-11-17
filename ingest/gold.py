@@ -48,4 +48,12 @@ def test_targets_sql(events: str = "interaction_events") -> str:
 
 def repo_funnel_sql(events: str = "interaction_events") -> str:
     """Per repo, distinct outside actors at each stage: stargazers, issue openers, PR openers, reviewers, mergers."""
-    return "SELECT 1 AS x"  # stub: repo_funnel_sql
+    stages = ", ".join(
+        f"count(DISTINCT actor_id) FILTER (WHERE kind = '{kind}') AS {name}"
+        for kind, name in (("star", "stargazers"), ("issue_opened", "issue_openers"), ("pr_opened", "pr_openers"),
+                           ("review", "reviewers"), ("merge", "mergers"))
+    )
+    return (
+        f"SELECT repo_id, any_value(repo_name) AS repo_name, {stages}, count(DISTINCT actor_id) AS actors "
+        f"FROM {events} GROUP BY repo_id"
+    )
