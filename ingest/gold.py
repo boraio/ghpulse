@@ -13,6 +13,8 @@ KINDS = (
     ("reviews", "action = 'created'", "review"),
 )
 
+# Start of the test week (UTC). Training uses only events before it; fixed 2026-11-17 in milestone_01_measurements.md.
+CUTOFF = "2026-09-29 00:00:00"
 
 def events_sql() -> str:
     """SELECT of qualifying interaction events over relations pull_requests, issues, stars, reviews and markers (dt, hour, stable)."""
