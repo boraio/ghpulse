@@ -46,6 +46,6 @@ def test_targets_sql(events: str = "interaction_events") -> str:
     )
 
 
-    def repo_funnel_sql(events: str = "interaction_events") -> str:
-        """Per repo, distinct outside actors at each stage: stargazers, issue openers, PR openers, reviewers, mergers."""
-        return "SELECT 1 AS x"  # stub: repo_funnel_sql
+def repo_funnel_sql(events: str = "interaction_events") -> str:
+    """Per repo, distinct outside actors at each stage: stargazers, issue openers, PR openers, reviewers, mergers."""
+    return "SELECT 1 AS x"  # stub: repo_funnel_sql
