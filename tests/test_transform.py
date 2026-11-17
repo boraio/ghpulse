@@ -467,6 +467,8 @@ def main() -> int:
         check("gold cutoff is the start of the test week", getattr(gold, "CUTOFF", None), "2026-09-29 00:00:00"),
         check("gold repo funnel: distinct outside actors per stage", gold_fixtures.rows(f"SELECT repo_name, stargazers, issue_openers, pr_openers, reviewers, mergers, actors FROM ({gold.repo_funnel_sql(f'({gold.events_sql()})')})"), [("org/a", 1, 0, 1, 0, 1, 2), ("org/b", 0, 2, 0, 0, 0, 2), ("org/c", 0, 0, 0, 1, 0, 1)]),
         check("gold repo funnel: columns", gold_fixtures.columns(gold.repo_funnel_sql(f"({gold.events_sql()})")), ["repo_id", "repo_name", "stargazers", "issue_openers", "pr_openers", "reviewers", "mergers", "actors"]),
+        check("gold runner on a stable hour: exit code, events, train pairs, test targets", (gold_runner_fixtures.run_gold(silver_one_result()[1], gold_runner_fixtures.stable_manifest(silver_one_result()[1]), "gold_stable"), parquet_count(str(silver_one_result()[1] / "gold_stable" / "interaction_events" / "data.parquet")), parquet_count(str(silver_one_result()[1] / "gold_stable" / "interactions_train" / "data.parquet")), parquet_count(str(silver_one_result()[1] / "gold_stable" / "test_targets" / "data.parquet"))), (0, 6, 4, 0)),
+        check("gold runner on an unstable hour writes no events", (gold_runner_fixtures.run_gold(silver_one_result()[1], str(silver_one_result()[1] / "manifest"), "gold_unstable"), parquet_count(str(silver_one_result()[1] / "gold_unstable" / "interaction_events" / "data.parquet"))), (0, 0)),
     ]
 
     print()
