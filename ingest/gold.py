@@ -38,4 +38,9 @@ def train_sql(events: str = "interaction_events") -> str:
 
 def test_targets_sql(events: str = "interaction_events") -> str:
     """(actor, repo) pairs first seen at or after CUTOFF, for actors with at least one event before it."""
-    return "SELECT 1 AS x"  # stub: test_targets_sql
+    return (
+        "SELECT actor_id, any_value(actor_login) AS actor_login, repo_id, any_value(repo_name) AS repo_name, "
+        f"min(created_at) AS first_seen FROM {events} GROUP BY actor_id, repo_id "
+        f"HAVING min(created_at) >= TIMESTAMP '{CUTOFF}' "
+        f"AND actor_id IN (SELECT actor_id FROM {events} WHERE created_at < TIMESTAMP '{CUTOFF}')"
+    )
