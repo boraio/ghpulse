@@ -469,6 +469,13 @@ def main() -> int:
         check("gold repo funnel: columns", gold_fixtures.columns(gold.repo_funnel_sql(f"({gold.events_sql()})")), ["repo_id", "repo_name", "stargazers", "issue_openers", "pr_openers", "reviewers", "mergers", "actors"]),
         check("gold runner on a stable hour: exit code, events, train pairs, test targets", (gold_runner_fixtures.run_gold(silver_one_result()[1], gold_runner_fixtures.stable_manifest(silver_one_result()[1]), "gold_stable"), parquet_count(str(silver_one_result()[1] / "gold_stable" / "interaction_events" / "data.parquet")), parquet_count(str(silver_one_result()[1] / "gold_stable" / "interactions_train" / "data.parquet")), parquet_count(str(silver_one_result()[1] / "gold_stable" / "test_targets" / "data.parquet"))), (0, 6, 4, 0)),
         check("gold runner on an unstable hour writes no events", (gold_runner_fixtures.run_gold(silver_one_result()[1], str(silver_one_result()[1] / "manifest"), "gold_unstable"), parquet_count(str(silver_one_result()[1] / "gold_unstable" / "interaction_events" / "data.parquet"))), (0, 0)),
+        check("gold automation: too many training repos flags bob, not alice (her second repo is in the test week)", gold_fixtures.rows(f"SELECT actor_login FROM ({gold.automation_sql(f'({gold.events_sql()})', 1, 99)})"), [("bob",)]),
+        check("gold automation: a burst within one training hour flags bob, not alice (her burst is in the test week)", gold_fixtures.rows(f"SELECT actor_login FROM ({gold.automation_sql(f'({gold.events_sql()})', 99, 1)})"), [("bob",)]),
+        check("gold automation: the real thresholds flag nobody in the fixtures", gold_fixtures.rows(f"SELECT actor_login FROM ({gold.automation_sql(f'({gold.events_sql()})')})"), []),
+        check("gold automation: columns", gold_fixtures.columns(gold.automation_sql(f"({gold.events_sql()})")), ["actor_id", "actor_login", "repos", "peak"]),
+        check("gold automation: repos and peak for a flagged actor", gold_fixtures.rows(f"SELECT actor_login, repos, peak FROM ({gold.automation_sql(f'({gold.events_sql()})', 1, 99)})"), [("bob", 2, 2)]),
+        check("gold automation thresholds are 50 repos and 30 events per hour", (getattr(gold, "AUTOMATION_MAX_REPOS", None), getattr(gold, "AUTOMATION_MAX_PER_HOUR", None)), (50, 30)),
+        check("gold runner writes the automation list", parquet_count(str(silver_one_result()[1] / "gold_stable" / "automation_actors" / "data.parquet")), 0),
     ]
 
     print()
