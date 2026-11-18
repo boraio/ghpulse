@@ -54,7 +54,12 @@ WINDOW = ("2026-09-06T00", "2026-10-05T23")
 
 def automation_sql(events: str = "interaction_events", max_repos: int = AUTOMATION_MAX_REPOS, max_per_hour: int = AUTOMATION_MAX_PER_HOUR) -> str:
     """Actors treated as automation, on events before CUTOFF only: more than max_repos distinct repos or more than max_per_hour events in one hour."""
-    return "SELECT 1 AS x"  # stub: automation_sql
+    return (
+        "SELECT actor_id, any_value(actor_login) AS actor_login, count(DISTINCT repo_id) AS repos, max(per_hour) AS peak FROM ("
+        "SELECT *, count(*) OVER (PARTITION BY actor_id, dt, hour) AS per_hour "
+        f"FROM {events} WHERE created_at < TIMESTAMP '{CUTOFF}') "
+        f"GROUP BY actor_id HAVING count(DISTINCT repo_id) > {max_repos} OR max(per_hour) > {max_per_hour}"
+    )
 
 
 def main(argv=None) -> int:
