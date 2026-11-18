@@ -52,6 +52,11 @@ def train_sql(events: str = "interaction_events") -> str:
 WINDOW = ("2026-09-06T00", "2026-10-05T23")
 
 
+def automation_sql(events: str = "interaction_events", max_repos: int = AUTOMATION_MAX_REPOS, max_per_hour: int = AUTOMATION_MAX_PER_HOUR) -> str:
+    """Actors treated as automation, on events before CUTOFF only: more than max_repos distinct repos or more than max_per_hour events in one hour."""
+    return "SELECT 1 AS x"  # stub: automation_sql
+
+
 def main(argv=None) -> int:
     """Build the gold tables for a range of hours from silver and its markers, write them under --gold-root, print counts."""
     p = argparse.ArgumentParser(description=main.__doc__)
