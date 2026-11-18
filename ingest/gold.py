@@ -90,8 +90,9 @@ def main(argv=None) -> int:
         files = [f"{args.silver_root}/{t}/dt={d}/hour=*/data.parquet" for d in days]
         con.execute(f"CREATE TABLE {t} AS SELECT * FROM read_parquet({files}, hive_partitioning=false)")
     con.execute(f"CREATE TABLE interaction_events AS {events_sql()}")
-    outputs = {"interaction_events": "SELECT * FROM interaction_events", "interactions_train": train_sql(),
-               "test_targets": test_targets_sql(), "repo_funnel": repo_funnel_sql()}
+    outputs = {"interaction_events": "SELECT * FROM interaction_events", "automation_actors": "SELECT * FROM automation_actors",
+               "interactions_train": train_sql("kept_events"), "test_targets": test_targets_sql("kept_events"),
+               "repo_funnel": repo_funnel_sql("kept_events")}
     for name, sql in outputs.items():
         path = f"{args.gold_root}/{name}/data.parquet"
         if not path.startswith("s3://"):
