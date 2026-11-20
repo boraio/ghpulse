@@ -250,6 +250,69 @@ observable at ~2% capture; it becomes a repo-level descriptive analysis with
 the sampling caveat, and complete per-repo histories from the GitHub API
 (option B) stay a possible later extension.
 
+## Forward ingest to Nov 15 and the fixed window (2026-11-17)
+
+Ingested 2026-10-23T00…11-15T23: 576 hours, 0 absent, 0 failed, 10.5 minutes.
+Bronze now covers 2026-09-01…11-15: 1,824 markers, all `ingested`, `rows =
+source_lines` on every one, 86,805,339 events. 934 of 1,824 hours pass the
+stability rule.
+
+**A long capture break from Oct 23.** Per day, Oct 18 – Nov 15 (hours with no
+pushes; median events per hour; median push share; median non-push per hour):
+
+| Days | Zero-push hours per day | Median events/hour | Median push share | Median non-push/hour |
+|---|---|---|---|---|
+| Oct 19–21 | 0 | 44k–54k | 0.75–0.78 | 10.8k–11.9k |
+| Oct 23, Oct 26 – Nov 13 (most days) | 13–24 | 3.2k–4.8k | 0.0 | 3.1k–4.8k |
+| Oct 24–25 | 0–3 | 30k–78k | 0.75–0.82 | 7.3k–14.1k |
+| Nov 5, Nov 14–15 (partial recovery) | 6–7 | 9k–12k | 0.46–0.57 | 4.9k–5.3k |
+
+This is the Sep 1–3 pattern (pushes absent, a few thousand other events per
+hour), not a uniform drop in capture: push share collapses to 0 rather than
+holding steady at a lower volume. It lasts about three weeks with brief
+recoveries and is only partly over by Nov 15. Cause unknown. Consequence: data
+after Oct 22 is not usable for the funnel or the recommender as it stands, and
+extending the data later means re-checking each new period with the rule.
+
+**Window search over Sep 1 – Nov 15** (30 days starting at midnight, split as the
+evaluation will be: 23 days of training, a 7-day test week; missing hours count
+as failing). Best by failing test-week hours, then failing training hours:
+
+| Window | Passing of 720 | Failing in training | Failing in test week |
+|---|---|---|---|
+| Sep 6 – Oct 5 | 585 | 135 | 0 |
+| Sep 5 – Oct 4 | 561 | 159 | 0 |
+| Sep 7 – Oct 6 | 604 | 111 | 5 |
+| Sep 15 – Oct 14 | 647 | 55 | 18 |
+
+**Decided 2026-11-17, before anything is computed on it: the window is
+2026-09-06T00 … 2026-10-05T23. Training is Sep 6–28 (23 days); the test week is
+Sep 29 – Oct 5 (7 days, every hour stable).** It is the only window whose test
+week is fully clean; its 135 unstable training hours (mostly Sep 6–12) are
+masked with the `stable` flag and reported alongside every metric. Changing it
+later means redoing everything downstream, so it changes only for a reason
+written here.
+
+## Activity per stable hour varies about 12× within the window (2026-11-17)
+
+Silver rows per stable hour, by day, over the fixed window: pull requests range
+from about 500 per hour (Sep 19–21, Sep 27) to about 6,200 (Sep 12), and issues,
+stars and reviews move with them in roughly fixed proportions (about 2 : 1 :
+0.7 : 0.5). Total bronze events per hour do not track this: they run 37k–123k,
+and the highest bronze days (Sep 19–20, Sep 27) are among the lowest silver
+days. Sep 22–28 averaged about 900 PR rows per hour; the test week Sep 29 –
+Oct 5 about 2,100.
+
+Reading, not a conclusion: within hours that pass the stability rule, the
+capture of the non-push event types the recommender uses still swings by about
+an order of magnitude from day to day, while pushes dominate the hour totals.
+The rule's tests (push share, non-push volume within 3×) do not see this.
+Real GitHub activity is very unlikely to swing 12× between adjacent days, so
+this is probably the archive. Consequences: popularity estimated on the
+training period is weighted towards high-capture days (Sep 12–17); the
+comparison between models on the same test week stays fair; absolute metrics
+depend on the test week's capture. Recorded as a limitation; the window stands.
+
 ## Open questions
 
 - What causes the capture regimes, and do they recur in the candidate month?

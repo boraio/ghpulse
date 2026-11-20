@@ -121,14 +121,18 @@ Done and verified offline:
 
 **Step 3 (silver, DuckDB) is done** and merged as `fe969ca` (2026-11-12): four silver
 tables for Sep 22–28, reconciled hour by hour against bronze, 113 PASS. Step 4
-(data-quality gates) is built on branch `quality` and passes live over Sep 22–28,
-136 PASS (see
+(data-quality gates) is done, merged as `2237977`, and passes live over Sep 22–28,
+136 PASS. **Step 5 is done** (2026-11-17): the month is fixed as Sep 6 – Oct 5
+(train Sep 6–28, test week Sep 29 – Oct 5, every test hour stable), silver is
+built over it and the gates report 0 violations across all 720 hours (details:
 **`milestone_01_step3.md`** and **`milestone_01_step4.md`**). The recommender proceeds on GH Archive's
 ~2% sample (decided 2026-10-23).
 
-Next: silver transforms in DuckDB (step 3), developed on Sep 22–28; the
-month window is chosen at step 5. Decisions, remaining work and open unknowns
-are in **`milestone_01_step0.md`**.
+**Step 6 (gold) is built** (2026-11-18): interactions, test targets and repo
+funnel for the fixed window, 81 automation actors excluded, 25,270 evaluable
+actors (see **`milestone_01_step6.md`**). Next: the most-popular baseline on
+the temporal split (step 7). Window decision and
+capture-break record: **`milestone_01_measurements.md`**.
 
 ## Milestones
 
@@ -304,6 +308,10 @@ wrong in milestone 1 step 0.
   Run the suite in the other pane.
 - `/diff` goes through `less` and hides its output; use
   `git --no-pager diff`.
+- **Merge with `gh pr merge <n> --squash --subject "<title> (#n)" --body-file
+  <file>`**, which sets the squash message exactly. Delete a branch only after
+  `git pull` on `main` shows the merge: deleting the head branch of an open PR
+  closes it unmerged (happened with PR #3; restored and reopened).
 - aider commits every edit, so the branch fills with small commits. Merge with
   GitHub's "Squash and merge" (enabled on the repo), so `main` gets one commit
   and the pushed branch is never rewritten.
@@ -331,6 +339,11 @@ wrong in milestone 1 step 0.
   an anchor with `grep -n -A2` before using it; for "append at the end of the
   file", quote the file's actual last lines; and keep an offline check that runs
   each CLI module as a script, not only as an import.
+- **An insertion anchored on an indented line comes out indented.** In step 6 a
+  new top-level function anchored on the last lines of another function was
+  nested inside it, so the module had no such function (a guarded script
+  dedented it, `091cb19`). Prompts that add top-level code say "at column 0,
+  with no indentation", and new fixtures go in new files, which need no anchor.
 - **Take the red checkpoint before sending the implementation prompt.** A
   checkpoint taken after it shows green or mixed counts and proves nothing about
   the checks failing first.
