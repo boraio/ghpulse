@@ -193,6 +193,9 @@ def main() -> int:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ingest"))
     import backfill
     import fetch
+    import gold_runner_fixtures
+    import gold
+    import gold_fixtures
     import quality_fixtures
     import quality
     import silver
@@ -454,6 +457,25 @@ def main() -> int:
         check("load_marker: hour=05 in the path still reads as the integer 5", (lambda m: (m.get("hour"), type(m.get("hour")).__name__))(quality.load_marker(duckdb.connect(), quality_fixtures.marker_at(silver_one_result()[1], 5))), (5, "int")),
         check("load_marker: dt and status come back as stored", [quality.load_marker(duckdb.connect(), quality_fixtures.marker_at(silver_one_result()[1], 5)).get(k) for k in ("dt", "status")], ["2026-09-23", "ingested"]),
         check("quality.py run as a script exits 0 on a clean hour", quality_fixtures.run_quality_script("--start", "2026-09-23T12", "--end", "2026-09-23T12", "--silver-root", str(silver_one_result()[1] / "silver"), "--manifest-root", str(silver_one_result()[1] / "manifest")), 0),
+        check("gold events: one row per qualifying event", gold_fixtures.rows(f"SELECT actor_login, repo_name, kind FROM ({gold.events_sql()})"), [("alice", "org/a", "pr_opened"), ("alice", "org/a", "star"), ("alice", "org/b", "issue_opened"), ("bob", "org/a", "merge"), ("bob", "org/c", "review"), ("erin", "org/b", "issue_opened")]),
+        check("gold events: own repos, unstable hours and housekeeping are excluded", gold_fixtures.rows(f"SELECT count(*) FROM ({gold.events_sql()}) WHERE actor_login IN ('carol', 'dave', 'frank') OR repo_name = 'alice/x'"), [(0,)]),
+        check("gold events: weights per kind", gold_fixtures.rows(f"SELECT DISTINCT kind, weight FROM ({gold.events_sql()})"), [("issue_opened", 2), ("merge", 4), ("pr_opened", 3), ("review", 3), ("star", 1)]),
+        check("gold events: columns", gold_fixtures.columns(gold.events_sql()), ["actor_id", "actor_login", "repo_id", "repo_name", "kind", "weight", "created_at", "dt", "hour"]),
+        check("gold train: pairs, summed weights and counts from before the cutoff", gold_fixtures.rows(f"SELECT actor_login, repo_name, weight, n_events FROM ({gold.train_sql(f'({gold.events_sql()})')})"), [("alice", "org/a", 3, 1), ("bob", "org/a", 4, 1), ("bob", "org/c", 3, 1)]),
+        check("gold train: nothing from the test week leaks in", gold_fixtures.rows(f"SELECT count(*) FROM ({gold.train_sql(f'({gold.events_sql()})')}) WHERE last_seen >= TIMESTAMP '2026-09-29'"), [(0,)]),
+        check("gold test targets: new repos in the test week, only for actors with training history", gold_fixtures.rows(f"SELECT actor_login, repo_name FROM ({gold.test_targets_sql(f'({gold.events_sql()})')})"), [("alice", "org/b")]),
+        check("gold cutoff is the start of the test week", getattr(gold, "CUTOFF", None), "2026-09-29 00:00:00"),
+        check("gold repo funnel: distinct outside actors per stage", gold_fixtures.rows(f"SELECT repo_name, stargazers, issue_openers, pr_openers, reviewers, mergers, actors FROM ({gold.repo_funnel_sql(f'({gold.events_sql()})')})"), [("org/a", 1, 0, 1, 0, 1, 2), ("org/b", 0, 2, 0, 0, 0, 2), ("org/c", 0, 0, 0, 1, 0, 1)]),
+        check("gold repo funnel: columns", gold_fixtures.columns(gold.repo_funnel_sql(f"({gold.events_sql()})")), ["repo_id", "repo_name", "stargazers", "issue_openers", "pr_openers", "reviewers", "mergers", "actors"]),
+        check("gold runner on a stable hour: exit code, events, train pairs, test targets", (gold_runner_fixtures.run_gold(silver_one_result()[1], gold_runner_fixtures.stable_manifest(silver_one_result()[1]), "gold_stable"), parquet_count(str(silver_one_result()[1] / "gold_stable" / "interaction_events" / "data.parquet")), parquet_count(str(silver_one_result()[1] / "gold_stable" / "interactions_train" / "data.parquet")), parquet_count(str(silver_one_result()[1] / "gold_stable" / "test_targets" / "data.parquet"))), (0, 6, 4, 0)),
+        check("gold runner on an unstable hour writes no events", (gold_runner_fixtures.run_gold(silver_one_result()[1], str(silver_one_result()[1] / "manifest"), "gold_unstable"), parquet_count(str(silver_one_result()[1] / "gold_unstable" / "interaction_events" / "data.parquet"))), (0, 0)),
+        check("gold automation: too many training repos flags bob, not alice (her second repo is in the test week)", gold_fixtures.rows(f"SELECT actor_login FROM ({gold.automation_sql(f'({gold.events_sql()})', 1, 99)})"), [("bob",)]),
+        check("gold automation: a burst within one training hour flags bob, not alice (her burst is in the test week)", gold_fixtures.rows(f"SELECT actor_login FROM ({gold.automation_sql(f'({gold.events_sql()})', 99, 1)})"), [("bob",)]),
+        check("gold automation: the real thresholds flag nobody in the fixtures", gold_fixtures.rows(f"SELECT actor_login FROM ({gold.automation_sql(f'({gold.events_sql()})')})"), []),
+        check("gold automation: columns", gold_fixtures.columns(gold.automation_sql(f"({gold.events_sql()})")), ["actor_id", "actor_login", "repos", "peak"]),
+        check("gold automation: repos and peak for a flagged actor", gold_fixtures.rows(f"SELECT actor_login, repos, peak FROM ({gold.automation_sql(f'({gold.events_sql()})', 1, 99)})"), [("bob", 2, 2)]),
+        check("gold automation thresholds are 50 repos and 30 events per hour", (getattr(gold, "AUTOMATION_MAX_REPOS", None), getattr(gold, "AUTOMATION_MAX_PER_HOUR", None)), (50, 30)),
+        check("gold runner writes the automation list", parquet_count(str(silver_one_result()[1] / "gold_stable" / "automation_actors" / "data.parquet")), 0),
     ]
 
     print()

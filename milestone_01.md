@@ -197,3 +197,25 @@ a positive one with a leaky split.
   storage and table gates in `ingest/quality.py`, checked offline in CI (136
   PASS) and live over Sep 22–28 with 0 violations; a deliberate gap is reported
   and exits 1. Details in `milestone_01_step4.md`.
+- **Step 4 merged** as `2237977` (PR #3), 2026-11-16. Step 5 (the month) is next.
+- **Window fixed for steps 5–7** (2026-11-17): **2026-09-06T00 … 2026-10-05T23**,
+  training Sep 6–28, test week Sep 29 – Oct 5 (every hour stable). Bronze runs
+  to Nov 15, but Oct 23 – Nov 15 is a long capture break (pushes absent on most
+  days). Details in the measurements page.
+- **Step 5 (a month) done** (2026-11-17): silver built for the fixed window
+  Sep 6 – Oct 5 (552 new hours, 0 failed, 17 min; Sep 22–28 reused). Silver
+  `--status`: 720 ingested, 0 drift. Quality gates over all 720 hours: 0
+  violations, including no id repeated across hours. Markers: 720, 585 stable,
+  all 168 test-week hours stable, matching the window search. Row totals over
+  all 720 hours: pull_requests 2,449,121; issues 1,225,920; stars 746,678;
+  reviews 571,435. These are far above 4.3× the Sep 22–28 week (153,597 PR
+  rows), which suggests the unstable early-September hours carry much of the
+  volume; not yet measured. Gold uses stable hours only.
+- **Step 6 (gold) built** (2026-11-18): `ingest/gold.py` writes
+  `interaction_events`, `automation_actors`, `interactions_train` (before the
+  Sep 29 cutoff only), `test_targets` and `repo_funnel` to `s3://ghpulse/gold/`.
+  After excluding 81 automation actors (rule decided before scoring): 424,020
+  training pairs, 36,516 test targets from **25,270 evaluable actors**; 56% of
+  targets are repos unseen in training, so any recommender ranking training
+  repos can reach at most about 44% of them. Details in
+  `milestone_01_step6.md`.
